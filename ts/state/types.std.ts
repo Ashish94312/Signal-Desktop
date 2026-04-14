@@ -29,6 +29,7 @@ import type { actions as lightbox } from './ducks/lightbox.preload.ts';
 import type { actions as linkPreviews } from './ducks/linkPreviews.preload.ts';
 import type { actions as mediaGallery } from './ducks/mediaGallery.preload.ts';
 import type { actions as megaphones } from './ducks/megaphones.preload.ts';
+import type { actions as mimoSession } from './ducks/mimoSession.preload.ts';
 import type { actions as nav } from './ducks/nav.std.ts';
 import type { actions as network } from './ducks/network.dom.ts';
 import type { actions as notificationProfiles } from './ducks/notificationProfiles.preload.ts';
@@ -67,6 +68,7 @@ export type ReduxActions = {
   linkPreviews: typeof linkPreviews;
   mediaGallery: typeof mediaGallery;
   megaphones: typeof megaphones;
+  mimoSession: typeof mimoSession;
   nav: typeof nav;
   network: typeof network;
   notificationProfiles: typeof notificationProfiles;

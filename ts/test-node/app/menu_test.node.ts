@@ -15,6 +15,7 @@ import type { LoggerType } from '../../types/Logging.std.ts';
 import { HourCyclePreference } from '../../types/I18N.std.ts';
 
 const forceUpdate = stub();
+const openMimoMetadataMonitor = stub();
 const openArtCreator = stub();
 const openContactUs = stub();
 const openForums = stub();
@@ -23,6 +24,8 @@ const openReleaseNotes = stub();
 const openSupportPage = stub();
 const setupAsNewDevice = stub();
 const setupAsStandalone = stub();
+const simulateMimoClientMetadata = stub();
+const showTherapistConsole = stub();
 const showAbout = stub();
 const showDebugLog = stub();
 const showKeyboardShortcuts = stub();
@@ -70,6 +73,19 @@ const getExpectedViewMenu = (): MenuItemConstructorOptions => ({
     { accelerator: 'CmdOrCtrl+-', label: 'Zoom Out', click: zoomOut },
     { type: 'separator' },
     { label: 'Toggle Full Screen', role: 'togglefullscreen' },
+    { type: 'separator' },
+    {
+      label: 'Session Console',
+      click: showTherapistConsole,
+    },
+    {
+      label: 'MiMo Metadata Monitor',
+      click: openMimoMetadataMonitor,
+    },
+    {
+      label: 'Simulate MiMo Client Metadata',
+      click: simulateMimoClientMetadata,
+    },
     { type: 'separator' },
     { label: 'Debug Log', click: showDebugLog },
     { type: 'separator' },
@@ -226,6 +242,7 @@ describe('createTemplate', () => {
 
   const actions = {
     forceUpdate,
+    openMimoMetadataMonitor,
     openArtCreator,
     openContactUs,
     openForums,
@@ -234,6 +251,8 @@ describe('createTemplate', () => {
     openSupportPage,
     setupAsNewDevice,
     setupAsStandalone,
+    simulateMimoClientMetadata,
+    showTherapistConsole,
     showAbout,
     showDebugLog,
     showKeyboardShortcuts,

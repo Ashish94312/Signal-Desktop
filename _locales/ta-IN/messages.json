@@ -773,6 +773,15 @@
   "icu:debugLog": {
     "messageformat": "பிழைத்திருத்த பதிவு"
   },
+  "icu:mimoMenuSessionConsole": {
+    "messageformat": "Session Console"
+  },
+  "icu:mimoMenuOpenMetadataMonitor": {
+    "messageformat": "MiMo Metadata Monitor"
+  },
+  "icu:mimoMenuSimulateClientMetadata": {
+    "messageformat": "Simulate MiMo Client Metadata"
+  },
   "icu:forceUpdate": {
     "messageformat": "கட்டாய புதுப்பிப்பு"
   },

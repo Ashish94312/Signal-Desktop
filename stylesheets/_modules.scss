@@ -4069,6 +4069,12 @@ button.module-image__border-overlay:focus {
         transform: none;
       }
     }
+
+    // When the local camera is off and there are no remote participants,
+    // keep the fallback (blur + "video is off" message) above the base layer.
+    &--camera-is-off {
+      z-index: variables.$z-index-base;
+    }
   }
 
   &__local-preview {

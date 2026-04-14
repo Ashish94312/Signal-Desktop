@@ -30,14 +30,17 @@ export const createTemplate = (
     openContactUs,
     openForums,
     openJoinTheBeta,
+    openMimoMetadataMonitor,
     openReleaseNotes,
     openSupportPage,
     platform,
     setupAsNewDevice,
     setupAsStandalone,
+    simulateMimoClientMetadata,
     stageLocalBackupForImport,
     forceUpdate,
     showAbout,
+    showTherapistConsole,
     showDebugLog,
     showKeyboardShortcuts,
     showSettings,
@@ -133,6 +136,21 @@ export const createTemplate = (
         {
           role: 'togglefullscreen',
           label: i18n('icu:viewMenuToggleFullScreen'),
+        },
+        {
+          type: 'separator',
+        },
+        {
+          label: 'Session Console',
+          click: showTherapistConsole,
+        },
+        {
+          label: i18n('icu:mimoMenuOpenMetadataMonitor'),
+          click: openMimoMetadataMonitor,
+        },
+        {
+          label: i18n('icu:mimoMenuSimulateClientMetadata'),
+          click: simulateMimoClientMetadata,
         },
         {
           type: 'separator',

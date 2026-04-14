@@ -518,6 +518,19 @@ export function CallScreen({
   const isLonelyInCall = !activeCall.remoteParticipants.length;
   const isAudioOnly = !hasLocalVideo && !hasRemoteVideo;
 
+  // With zero remote participants we omit GroupCallRemoteParticipants; otherwise its
+  // z-index sits above module-ongoing-call__local-preview-fullsize (negative z-index)
+  // and hides the camera-off / avatar layer behind an empty black grid.
+  useEffect(() => {
+    if (!isGroupOrAdhocActiveCall(activeCall)) {
+      return;
+    }
+    if (activeCall.remoteParticipants.length > 0) {
+      return;
+    }
+    setGroupCallVideoRequest([], 0);
+  }, [activeCall, setGroupCallVideoRequest]);
+
   const controlsFadedOut = !showControls && !isAudioOnly && isConnected;
   const controlsFadeClass = classNames({
     'module-ongoing-call__controls': true,
@@ -609,6 +622,8 @@ export function CallScreen({
       <div
         className={classNames(
           'module-ongoing-call__local-preview-fullsize',
+          !isSendingVideo &&
+            'module-ongoing-call__local-preview-fullsize--camera-is-off',
           presentingSource &&
             'module-ongoing-call__local-preview-fullsize--presenting'
         )}
@@ -983,24 +998,25 @@ export function CallScreen({
     }
     case CallMode.Group:
     case CallMode.Adhoc:
-      remoteParticipantsElement = (
-        <GroupCallRemoteParticipants
-          callViewMode={activeCall.viewMode}
-          getGroupCallVideoFrameSource={getGroupCallVideoFrameSource}
-          imageDataCache={imageDataCache}
-          i18n={i18n}
-          joinedAt={activeCall.joinedAt}
-          remoteParticipants={activeCall.remoteParticipants}
-          setGroupCallVideoRequest={setGroupCallVideoRequest}
-          remoteAudioLevels={activeCall.remoteAudioLevels}
-          isCallReconnecting={isReconnecting}
-          onClickRaisedHand={
-            raisedHandsCount > 0
-              ? () => setShowRaisedHandsList(true)
-              : undefined
-          }
-        />
-      );
+      remoteParticipantsElement =
+        activeCall.remoteParticipants.length > 0 ? (
+          <GroupCallRemoteParticipants
+            callViewMode={activeCall.viewMode}
+            getGroupCallVideoFrameSource={getGroupCallVideoFrameSource}
+            imageDataCache={imageDataCache}
+            i18n={i18n}
+            joinedAt={activeCall.joinedAt}
+            remoteParticipants={activeCall.remoteParticipants}
+            setGroupCallVideoRequest={setGroupCallVideoRequest}
+            remoteAudioLevels={activeCall.remoteAudioLevels}
+            isCallReconnecting={isReconnecting}
+            onClickRaisedHand={
+              raisedHandsCount > 0
+                ? () => setShowRaisedHandsList(true)
+                : undefined
+            }
+          />
+        ) : null;
       break;
     default:
       throw missingCaseError(activeCall);

@@ -773,6 +773,15 @@
   "icu:debugLog": {
     "messageformat": "ပြစ်ချက်မှတ်တမ်း"
   },
+  "icu:mimoMenuSessionConsole": {
+    "messageformat": "Session Console"
+  },
+  "icu:mimoMenuOpenMetadataMonitor": {
+    "messageformat": "MiMo Metadata Monitor"
+  },
+  "icu:mimoMenuSimulateClientMetadata": {
+    "messageformat": "Simulate MiMo Client Metadata"
+  },
   "icu:forceUpdate": {
     "messageformat": "မဖြစ်မနေ အပ်ဒိတ်လုပ်ရန်"
   },
