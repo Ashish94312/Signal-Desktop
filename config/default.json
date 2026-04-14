@@ -1,4 +1,5 @@
 {
+  "storageProfile": "therapist",
   "serverUrl": "https://chat.staging.signal.org",
   "storageUrl": "https://storage-staging.signal.org",
   "directoryUrl": "https://cdsi.staging.signal.org",

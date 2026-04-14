@@ -22,10 +22,15 @@ import { I18n } from '../I18n.dom.tsx';
 import { Spinner } from '../Spinner.dom.tsx';
 import { BrandedQRCode } from '../BrandedQRCode.dom.tsx';
 import { TitlebarDragArea } from '../TitlebarDragArea.dom.tsx';
-import { InstallScreenSignalLogo } from './InstallScreenSignalLogo.dom.tsx';
 import { InstallScreenUpdateDialog } from './InstallScreenUpdateDialog.dom.tsx';
 import { getClassNamesFor } from '../../util/getClassNamesFor.std.ts';
 import type { UpdatesStateType } from '../../state/ducks/updates.preload.ts';
+import { TherapistInstallLinkShell } from '../TherapistInstallLinkShell.dom.tsx';
+import {
+  CS,
+  csCard,
+  csWorkspaceTitle,
+} from '../therapistConsoleClinicalSerenity.std.ts';
 
 const { noop } = lodash;
 
@@ -65,10 +70,13 @@ export function InstallScreenQrCodeNotScannedStep({
   updates,
 }: Readonly<PropsType>): ReactElement {
   return (
-    <div className="module-InstallScreenQrCodeNotScannedStep">
+    <div
+      className={classNames(
+        'module-InstallScreenQrCodeNotScannedStep',
+        'module-InstallScreenQrCodeNotScannedStep--session-console'
+      )}
+    >
       <TitlebarDragArea />
-
-      <InstallScreenSignalLogo />
 
       {(hasExpired || updates.dialogType === DialogType.Downloading) && (
         <InstallScreenUpdateDialog
@@ -82,49 +90,82 @@ export function InstallScreenQrCodeNotScannedStep({
         />
       )}
 
-      <div className="module-InstallScreenQrCodeNotScannedStep__contents">
-        <InstallScreenQrCode
-          i18n={i18n}
-          {...provisioningUrl}
-          retryGetQrCode={retryGetQrCode}
-        />
-        <div className="module-InstallScreenQrCodeNotScannedStep__instructions">
-          <h1>{i18n('icu:Install__scan-this-code')}</h1>
-          <ol>
-            <li>{i18n('icu:Install__instructions__1')}</li>
-            <li>
-              <I18n
-                i18n={i18n}
-                id="icu:Install__instructions__2"
-                components={{
-                  settings: (
-                    <strong>
-                      {i18n('icu:Install__instructions__2__settings')}
-                    </strong>
-                  ),
-                  linkedDevices: <strong>{i18n('icu:linkedDevices')}</strong>,
-                }}
-              />
-            </li>
-            <li>
-              <I18n
-                i18n={i18n}
-                id="icu:Install__instructions__3"
-                components={{
-                  linkNewDevice: <strong>{i18n('icu:linkNewDevice')}</strong>,
-                }}
-              />
-            </li>
-          </ol>
-          {isStaging ? (
-            'THIS IS A STAGING DESKTOP'
-          ) : (
-            <a target="_blank" rel="noreferrer" href={SUPPORT_PAGE}>
-              {i18n('icu:Install__support-link')}
-            </a>
-          )}
-        </div>
-      </div>
+      <TherapistInstallLinkShell
+        mainColumn={
+          <>
+            <h2 style={{ ...csWorkspaceTitle(), marginBottom: '4px' }}>
+              Devices
+            </h2>
+            <p
+              style={{
+                margin: '0 0 20px',
+                fontSize: '13px',
+                color: CS.onSurfaceMuted,
+                lineHeight: 1.5,
+              }}
+            >
+              Link this computer from your phone to finish setup. Scan the code
+              on the left, or follow the steps on the right.
+            </p>
+            <div style={{ ...csCard(), padding: '24px' }}>
+              <div
+                className={classNames(
+                  'module-InstallScreenQrCodeNotScannedStep__contents',
+                  'module-InstallScreenQrCodeNotScannedStep__contents--session-console'
+                )}
+              >
+                <InstallScreenQrCode
+                  i18n={i18n}
+                  {...provisioningUrl}
+                  retryGetQrCode={retryGetQrCode}
+                />
+                <div className="module-InstallScreenQrCodeNotScannedStep__instructions">
+                  <h3 className="module-InstallScreenQrCodeNotScannedStep__scan-title">
+                    {i18n('icu:Install__scan-this-code')}
+                  </h3>
+                  <ol>
+                    <li>{i18n('icu:Install__instructions__1')}</li>
+                    <li>
+                      <I18n
+                        i18n={i18n}
+                        id="icu:Install__instructions__2"
+                        components={{
+                          settings: (
+                            <strong>
+                              {i18n('icu:Install__instructions__2__settings')}
+                            </strong>
+                          ),
+                          linkedDevices: (
+                            <strong>{i18n('icu:linkedDevices')}</strong>
+                          ),
+                        }}
+                      />
+                    </li>
+                    <li>
+                      <I18n
+                        i18n={i18n}
+                        id="icu:Install__instructions__3"
+                        components={{
+                          linkNewDevice: (
+                            <strong>{i18n('icu:linkNewDevice')}</strong>
+                          ),
+                        }}
+                      />
+                    </li>
+                  </ol>
+                  {isStaging ? (
+                    'THIS IS A STAGING DESKTOP'
+                  ) : (
+                    <a target="_blank" rel="noreferrer" href={SUPPORT_PAGE}>
+                      {i18n('icu:Install__support-link')}
+                    </a>
+                  )}
+                </div>
+              </div>
+            </div>
+          </>
+        }
+      />
     </div>
   );
 }

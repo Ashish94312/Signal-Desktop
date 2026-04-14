@@ -40,6 +40,8 @@ export const createTemplate = (
     showAbout,
     showDebugLog,
     showKeyboardShortcuts,
+    showTherapistConsole,
+    simulateMimoMetadata,
     showSettings,
     openArtCreator,
     zoomIn,
@@ -133,6 +135,17 @@ export const createTemplate = (
         {
           role: 'togglefullscreen',
           label: i18n('icu:viewMenuToggleFullScreen'),
+        },
+        {
+          type: 'separator',
+        },
+        {
+          label: 'Signal Therapist Console',
+          click: showTherapistConsole,
+        },
+        {
+          label: 'Simulate MiMo metadata (demo)',
+          click: simulateMimoMetadata,
         },
         {
           type: 'separator',

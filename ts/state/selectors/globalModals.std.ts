@@ -70,6 +70,11 @@ export const getIsStoriesSettingsVisible = createSelector(
   ({ isStoriesSettingsVisible }) => isStoriesSettingsVisible
 );
 
+export const getIsTherapistConsoleVisible = createSelector(
+  getGlobalModalsState,
+  ({ isTherapistConsoleVisible }) => isTherapistConsoleVisible
+);
+
 export const getSafetyNumberChangedBlockingData = createSelector(
   getGlobalModalsState,
   ({ safetyNumberChangedBlockingData }) => safetyNumberChangedBlockingData

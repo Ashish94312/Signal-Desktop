@@ -70,7 +70,7 @@ function initialLoadComplete(): InitialLoadCompleteActionType {
 }
 
 function openInbox(): ThunkAction<
-  void,
+  Promise<void>,
   RootStateType,
   unknown,
   OpenInboxActionType

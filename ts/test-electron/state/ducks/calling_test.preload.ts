@@ -2128,11 +2128,16 @@ describe('calling duck', () => {
 
       let rootState: RootStateType;
       let startCallingLobbyStub: sinon.SinonStub;
+      let startOutgoingDirectCallStub: sinon.SinonStub;
 
       beforeEach(function (this: Mocha.Context) {
         startCallingLobbyStub = this.sandbox
           .stub(callingService, 'startCallingLobby')
           .resolves();
+        startOutgoingDirectCallStub = this.sandbox.stub(
+          callingService,
+          'startOutgoingDirectCall'
+        );
 
         const emptyRootState = getEmptyRootState();
         rootState = {
@@ -2245,6 +2250,46 @@ describe('calling duck', () => {
               isConversationTooBigToRing: false,
             },
           });
+        });
+
+        it('places the outgoing direct call after the lobby is ready when requested', async () => {
+          startCallingLobbyStub.resolves({
+            callMode: CallMode.Direct,
+            hasLocalAudio: true,
+            hasLocalVideo: true,
+          });
+
+          let currentRootState = rootState;
+          const thunk = startCallingLobby({
+            conversationId: 'fake-conversation-id',
+            isVideoCall: true,
+            autoPlaceOutgoingDirectCall: true,
+          });
+          type DispatchType = Parameters<typeof thunk>[0];
+          type DispatchedActionType = Parameters<DispatchType>[0];
+          const dispatch: DispatchType = (action: DispatchedActionType) => {
+            if (typeof action === 'function') {
+              return action(dispatch, () => currentRootState, null);
+            }
+
+            currentRootState = {
+              ...currentRootState,
+              calling: reducer(
+                currentRootState.calling,
+                action as CallingActionType
+              ),
+            };
+            return action;
+          };
+
+          await thunk(dispatch, () => currentRootState, null);
+
+          sinon.assert.calledOnceWithExactly(
+            startOutgoingDirectCallStub,
+            'fake-conversation-id',
+            true,
+            true
+          );
         });
 
         it('dispatches two actions if the calling lobby returns nothing', async () => {

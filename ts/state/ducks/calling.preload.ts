@@ -434,6 +434,10 @@ export type SetGroupCallVideoRequestType = ReadonlyDeep<{
 export type StartCallingLobbyType = ReadonlyDeep<{
   conversationId: string;
   isVideoCall: boolean;
+  /** After lobby UI is ready, place the direct 1:1 call (same as pressing Start). */
+  autoPlaceOutgoingDirectCall?: boolean;
+  /** After lobby UI is ready, join group/adhoc (same as pressing Start). Therapist rejoin. */
+  autoJoinAfterLobby?: boolean;
 }>;
 
 export type StartCallLinkLobbyType = ReadonlyDeep<{
@@ -442,6 +446,7 @@ export type StartCallLinkLobbyType = ReadonlyDeep<{
 
 export type StartCallLinkLobbyByRoomIdType = ReadonlyDeep<{
   roomId: string;
+  autoJoinAfterLobby?: boolean;
 }>;
 
 type StartCallLinkLobbyThunkActionType = ReadonlyDeep<
@@ -2130,9 +2135,8 @@ function setGroupCallVideoRequest(
       payload.conversationId,
       payload.resolutions.map(resolution => ({
         ...resolution,
-        // The `framerate` property in RingRTC has to be set, even if it's set to
-        //   `undefined`.
-        framerate: undefined,
+        // RingRTC expects the key to exist even when uncapped.
+        framerate: resolution.framerate,
       })),
       payload.speakerHeight
     );
@@ -2266,6 +2270,9 @@ function onOutgoingVideoCallInConversation(
         startCallingLobby({
           conversationId,
           isVideoCall: true,
+          autoPlaceOutgoingDirectCall: isDirectConversation(
+            conversation.attributes
+          ),
         })
       );
     } else {
@@ -2305,6 +2312,7 @@ function onOutgoingAudioCallInConversation(
       startCallingLobby({
         conversationId,
         isVideoCall: false,
+        autoPlaceOutgoingDirectCall: true,
       })(dispatch, getState, undefined);
     } else {
       log.info(
@@ -2440,6 +2448,7 @@ function updateCallLinkRestrictions(
 
 function startCallLinkLobbyByRoomId({
   roomId,
+  autoJoinAfterLobby = false,
 }: StartCallLinkLobbyByRoomIdType): StartCallLinkLobbyThunkActionType {
   return async (dispatch, getState) => {
     const state = getState();
@@ -2450,7 +2459,12 @@ function startCallLinkLobbyByRoomId({
     );
 
     const { rootKey } = callLink;
-    await _startCallLinkLobby({ rootKey, dispatch, getState });
+    await _startCallLinkLobby({
+      rootKey,
+      dispatch,
+      getState,
+      autoJoinAfterLobby,
+    });
   };
 }
 
@@ -2466,7 +2480,9 @@ const _startCallLinkLobby = async ({
   rootKey,
   dispatch,
   getState,
+  autoJoinAfterLobby = false,
 }: {
+  autoJoinAfterLobby?: boolean;
   rootKey: string;
   dispatch: ThunkDispatch<
     RootStateType,
@@ -2605,6 +2621,13 @@ const _startCallLinkLobby = async ({
       },
     });
     success = true;
+    if (autoJoinAfterLobby) {
+      await joinMultiPartyLobbyAfterReady(roomId)(
+        dispatch,
+        getState,
+        undefined
+      );
+    }
   } catch (error) {
     log.error(`${logId}: Failed to start lobby`, Errors.toLogFormat(error));
   } finally {
@@ -2636,8 +2659,18 @@ function leaveCurrentCallAndStartCallingLobby(
 
     const { type } = data;
     if (type === 'conversation') {
-      const { conversationId, isVideoCall } = data;
-      startCallingLobby({ conversationId, isVideoCall })(
+      const {
+        conversationId,
+        isVideoCall,
+        autoJoinAfterLobby,
+        autoPlaceOutgoingDirectCall,
+      } = data;
+      startCallingLobby({
+        conversationId,
+        isVideoCall,
+        autoJoinAfterLobby,
+        autoPlaceOutgoingDirectCall,
+      })(
         dispatch,
         getState,
         undefined
@@ -2654,9 +2687,83 @@ function leaveCurrentCallAndStartCallingLobby(
   };
 }
 
+/**
+ * Ends the current call, waits for hang-up to finish, then opens the calling lobby for
+ * another conversation. Used for therapist breakout (group/call-link → direct 1:1) and
+ * returning from direct → GV2 group.
+ *
+ * For direct 1:1 targets, `autoPlaceOutgoingDirectCall` rings the peer immediately (same
+ * as pressing Start in the pre-call lobby). Without it, the UI stays on "Signal will ring…"
+ * until the user clicks Start.
+ *
+ * For group targets, `autoJoinAfterLobby` joins the group call after the lobby is ready
+ * (therapist rejoin from 1:1).
+ */
+function hangUpThenStartCallingLobby({
+  hangUpReason,
+  nextConversationId,
+  isVideoCall,
+  autoPlaceOutgoingDirectCall = false,
+  autoJoinAfterLobby = false,
+}: {
+  hangUpReason: string;
+  nextConversationId: string;
+  isVideoCall: boolean;
+  autoPlaceOutgoingDirectCall?: boolean;
+  autoJoinAfterLobby?: boolean;
+}): ThunkAction<Promise<void>, RootStateType, unknown, never> {
+  return async (dispatch, getState) => {
+    const state = getState();
+    const activeCall = getActiveCall(state.calling);
+    if (activeCall) {
+      log.info(
+        `hangUpThenStartCallingLobby: hanging up active ${activeCall.callMode} call, next lobby conversation=${nextConversationId}`
+      );
+      await hangUpActiveCall(hangUpReason)(dispatch, getState, undefined);
+    }
+    await startCallingLobby({
+      conversationId: nextConversationId,
+      isVideoCall,
+      autoPlaceOutgoingDirectCall,
+      autoJoinAfterLobby,
+    })(dispatch, getState, undefined);
+  };
+}
+
+/**
+ * Same as hangUpThenStartCallingLobby but opens a call-link (adhoc) lobby by room id.
+ */
+function hangUpThenStartCallLinkLobbyByRoomId({
+  hangUpReason,
+  roomId,
+  autoJoinAfterLobby = false,
+}: {
+  hangUpReason: string;
+  roomId: string;
+  autoJoinAfterLobby?: boolean;
+}): ThunkAction<Promise<void>, RootStateType, unknown, never> {
+  return async (dispatch, getState) => {
+    const state = getState();
+    const activeCall = getActiveCall(state.calling);
+    if (activeCall) {
+      log.info(
+        `hangUpThenStartCallLinkLobbyByRoomId: hanging up active call, next roomId=${roomId}`
+      );
+      await hangUpActiveCall(hangUpReason)(dispatch, getState, undefined);
+    }
+    await startCallLinkLobbyByRoomId({ roomId, autoJoinAfterLobby })(
+      dispatch,
+      getState,
+      undefined
+    );
+  };
+}
+
 function startCallingLobby({
   conversationId,
   isVideoCall,
+  autoPlaceOutgoingDirectCall = false,
+  autoJoinAfterLobby = false,
 }: StartCallingLobbyType): ThunkAction<
   void,
   RootStateType,
@@ -2703,6 +2810,8 @@ function startCallingLobby({
           type: 'conversation',
           conversationId,
           isVideoCall,
+          autoPlaceOutgoingDirectCall,
+          autoJoinAfterLobby,
         })
       );
       return;
@@ -2746,6 +2855,23 @@ function startCallingLobby({
         },
       });
       success = true;
+      if (
+        autoPlaceOutgoingDirectCall &&
+        callLobbyData.callMode === CallMode.Direct
+      ) {
+        await startCall({
+          callMode: CallMode.Direct,
+          conversationId,
+          hasLocalAudio: callLobbyData.hasLocalAudio,
+          hasLocalVideo: callLobbyData.hasLocalVideo,
+        })(dispatch, getState, undefined);
+      } else if (autoJoinAfterLobby) {
+        await joinMultiPartyLobbyAfterReady(conversationId)(
+          dispatch,
+          getState,
+          undefined
+        );
+      }
     } catch (error) {
       log.error(`${logId}: Failed to start lobby`, Errors.toLogFormat(error));
     } finally {
@@ -2850,6 +2976,38 @@ function startCall(
       default:
         throw missingCaseError(callMode);
     }
+  };
+}
+
+/**
+ * After group or call-link lobby is active, join the call (same as pressing Start).
+ */
+function joinMultiPartyLobbyAfterReady(
+  conversationId: string
+): ThunkAction<Promise<void>, RootStateType, unknown, never> {
+  return async (dispatch, getState) => {
+    const state = getState();
+    const acs = state.calling.activeCallState;
+    if (
+      !acs ||
+      acs.state !== 'Active' ||
+      acs.conversationId !== conversationId
+    ) {
+      log.warn('joinMultiPartyLobbyAfterReady: lobby not ready', acs);
+      return;
+    }
+    if (acs.callMode !== CallMode.Group && acs.callMode !== CallMode.Adhoc) {
+      return;
+    }
+    log.info(
+      `joinMultiPartyLobbyAfterReady: joining ${acs.callMode} ${conversationId}`
+    );
+    await startCall({
+      callMode: acs.callMode,
+      conversationId,
+      hasLocalAudio: acs.hasLocalAudio,
+      hasLocalVideo: acs.hasLocalVideo,
+    })(dispatch, getState, undefined);
   };
 }
 
@@ -3085,6 +3243,8 @@ export const actions = {
   groupCallRaisedHandsChange,
   groupCallStateChange,
   hangUpActiveCall,
+  hangUpThenStartCallLinkLobbyByRoomId,
+  hangUpThenStartCallingLobby,
   handleCallLinkUpdate,
   handleCallLinkUpdateLocal,
   handleCallLinkDelete,

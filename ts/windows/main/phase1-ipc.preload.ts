@@ -19,6 +19,7 @@ import * as Errors from '../../types/errors.std.ts';
 import { strictAssert } from '../../util/assert.std.ts';
 import { drop } from '../../util/drop.std.ts';
 import { explodePromise } from '../../util/explodePromise.std.ts';
+import type { MiMoMetadataIngestPayloadType } from '../../types/MiMoMetadata.std.ts';
 import { DataReader } from '../../sql/Client.preload.ts';
 import type { WindowsNotificationData } from '../../services/notifications.preload.ts';
 import {
@@ -107,6 +108,7 @@ const IPC: IPCType = {
     ipc.invoke('get-media-access-status', mediaType),
   openSystemMediaPermissions: mediaType =>
     ipc.invoke('open-system-media-permissions', mediaType),
+  openExternalUrl: (url: string) => ipc.invoke('open-external-url', url),
   getMediaPermissions: () => ipc.invoke('settings:get:mediaPermissions'),
   getMediaCameraPermissions: () =>
     ipc.invoke('settings:get:mediaCameraPermissions'),
@@ -164,6 +166,8 @@ const IPC: IPCType = {
   showWindowsNotification: async (data: WindowsNotificationData) => {
     return ipc.invoke('windows-notifications:show', data);
   },
+  setMiMoLocalClientSessionId: clientSessionId =>
+    ipc.invoke('mimo:set-local-client-session-id', clientSessionId),
   shutdown: () => {
     log.info('shutdown');
     ipc.send('shutdown');
@@ -363,6 +367,43 @@ window.sendChallengeRequest = request => ipc.send('challenge:request', request);
 ipc.on('show-keyboard-shortcuts', () => {
   window.Events.showKeyboardShortcuts();
 });
+
+ipc.on('show-therapist-console', () => {
+  const show = () => {
+    if (window.reduxActions?.globalModals?.showTherapistConsole) {
+      window.reduxActions.globalModals.showTherapistConsole();
+      return;
+    }
+
+    setTimeout(show, 50);
+  };
+
+  show();
+});
+
+ipc.on(
+  'mimo-ingest-metadata',
+  (_event, payload: MiMoMetadataIngestPayloadType) => {
+    const ingest = () => {
+      if (
+        !payload ||
+        typeof payload !== 'object' ||
+        typeof payload.clientSessionId !== 'string' ||
+        payload.clientSessionId.length === 0
+      ) {
+        return;
+      }
+      if (window.reduxActions?.mimoSession) {
+        window.reduxActions.mimoSession.ingestMetadata(payload);
+        return;
+      }
+      setTimeout(ingest, 50);
+    };
+
+    ingest();
+  }
+);
+
 ipc.on('add-dark-overlay', () => {
   window.Events.addDarkOverlay();
 });

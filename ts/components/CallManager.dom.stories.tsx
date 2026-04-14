@@ -4,6 +4,7 @@
 import * as React from 'react';
 import { action } from '@storybook/addon-actions';
 import type { Meta } from '@storybook/react';
+import type { AudioDevice } from '@signalapp/ringrtc';
 import type { PropsType } from './CallManager.dom.tsx';
 import { CallManager } from './CallManager.dom.tsx';
 import {
@@ -24,7 +25,10 @@ import type {
 } from '../state/ducks/conversations.preload.ts';
 import { AvatarColors } from '../types/Colors.std.ts';
 import { generateAci } from '../types/ServiceId.std.ts';
-import { getDefaultConversation } from '../test-helpers/getDefaultConversation.std.ts';
+import {
+  getDefaultConversation,
+  getDefaultGroup,
+} from '../test-helpers/getDefaultConversation.std.ts';
 import { fakeGetGroupCallVideoFrameSource } from '../test-helpers/fakeGetGroupCallVideoFrameSource.std.ts';
 import { StorySendMode } from '../types/Stories.std.ts';
 import {
@@ -100,17 +104,35 @@ const getCommonActiveCallData = () => ({
   showParticipantsList: false,
 });
 
+const defaultMicrophone: AudioDevice = {
+  index: 0,
+  name: 'Default Microphone',
+  uniqueId: 'default-microphone',
+};
+
+const defaultSpeaker: AudioDevice = {
+  index: 0,
+  name: 'Default Speaker',
+  uniqueId: 'default-speaker',
+};
+
 const createProps = (storyProps: Partial<PropsType> = {}): PropsType => ({
   ...storyProps,
   availableCameras: [],
+  availableCallLinks: [],
+  availableConversations: [],
   acceptCall: action('accept-call'),
   activeNotificationProfile: undefined,
+  addMembersToGroup: action('add-members-to-group'),
   approveUser: action('approve-user'),
+  availableMicrophones: [defaultMicrophone],
+  availableSpeakers: [defaultSpeaker],
   batchUserAction: action('batch-user-action'),
   bounceAppIconStart: action('bounce-app-icon-start'),
   bounceAppIconStop: action('bounce-app-icon-stop'),
   cancelCall: action('cancel-call'),
   changeCallView: action('change-call-view'),
+  changeIODevice: action('change-io-device'),
   closeNeedPermissionScreen: action('close-need-permission-screen'),
   declineCall: action('decline-call'),
   denyUser: action('deny-user'),
@@ -120,8 +142,14 @@ const createProps = (storyProps: Partial<PropsType> = {}): PropsType => ({
   getPresentingSources: action('get-presenting-sources'),
   hangUpActiveCall: action('hang-up-active-call'),
   hasInitialLoadCompleted: true,
+  hideTherapistConsole: action('hide-therapist-console'),
   i18n,
   isOnline: true,
+  isTherapistConsoleVisible: false,
+  onCreateCallLink: action('on-create-call-link'),
+  onJoinCallLink: action('on-join-call-link'),
+  onStartAudioCall: action('on-start-audio-call'),
+  onStartVideoCall: action('on-start-video-call'),
   ringingCall: null,
   callLink: storyProps.callLink ?? undefined,
   me: {
@@ -134,9 +162,15 @@ const createProps = (storyProps: Partial<PropsType> = {}): PropsType => ({
   notifyForCall: action('notify-for-call'),
   openSystemPreferencesAction: action('open-system-preferences-action'),
   playRingtone: action('play-ringtone'),
+  selectedCamera: undefined,
+  selectedMicrophone: defaultMicrophone,
+  selectedSpeaker: defaultSpeaker,
   cancelPresenting: action('cancel-presenting'),
   renderDeviceSelection: () => <div />,
   renderReactionPicker: () => <div />,
+  removeClientFromCall: action('remove-client-from-call'),
+  returnToActiveCall: action('return-to-active-call'),
+  sendRemoteMute: action('send-remote-mute'),
   sendGroupCallRaiseHand: action('send-group-call-raise-hand'),
   sendGroupCallReaction: action('send-group-call-reaction'),
   selectPresentingSource: action('select-presenting-source'),
@@ -149,6 +183,7 @@ const createProps = (storyProps: Partial<PropsType> = {}): PropsType => ({
   setRendererCanvas: action('set-renderer-canvas'),
   setOutgoingRing: action('set-outgoing-ring'),
   showContactModal: action('show-contact-modal'),
+  showConversation: action('show-conversation'),
   showShareCallLinkViaSignal: action('show-share-call-link-via-signal'),
   startCall: action('start-call'),
   stopRingtone: action('stop-ringtone'),
@@ -164,6 +199,7 @@ const createProps = (storyProps: Partial<PropsType> = {}): PropsType => ({
   ),
   toggleSelfViewExpanded: action('toggle-self-view-expanded'),
   toggleSettings: action('toggle-settings'),
+  updateCallLinkName: action('update-call-link-name'),
   pauseVoiceNotePlayer: action('pause-audio-player'),
 });
 
@@ -553,6 +589,75 @@ export function CallLinkWithUnknownContacts(): React.JSX.Element {
           ],
         }),
         callLink: FAKE_CALL_LINK_WITH_ADMIN_KEY,
+      })}
+    />
+  );
+}
+
+/** Therapist console over an ongoing group call (SmartCallManager passes breakout props). */
+export function TherapistConsoleOngoingGroupCall(): React.JSX.Element {
+  const groupConversation = getDefaultGroup({ title: 'Therapy Group' });
+  return (
+    <CallManager
+      {...createProps({
+        isTherapistConsoleVisible: true,
+        onTherapistBreakoutToOneToOne: action('therapist-breakout-to-1:1'),
+        onTherapistRejoinSavedMultiParty: action('therapist-rejoin-multiparty'),
+        activeCall: {
+          ...getCommonActiveCallData(),
+          conversation: groupConversation,
+          callMode: CallMode.Group,
+          connectionState: GroupCallConnectionState.Connected,
+          conversationsByDemuxId: new Map(),
+          deviceCount: 2,
+          joinState: GroupCallJoinState.Joined,
+          localDemuxId: 1,
+          maxDevices: 32,
+          groupMembers: [],
+          isConversationTooBigToRing: false,
+          peekedParticipants: [],
+          pendingParticipants: [],
+          raisedHands: new Set(),
+          remoteParticipants: [participant1, participant2],
+          remoteAudioLevels: new Map(),
+          suggestLowerHand: false,
+        },
+      })}
+    />
+  );
+}
+
+/** Rejoin banner after a simulated breakout (1:1 active + saved GV2 context). */
+export function TherapistConsoleDirectCallWithRejoinBanner(): React.JSX.Element {
+  return (
+    <CallManager
+      {...createProps({
+        isTherapistConsoleVisible: true,
+        therapistBreakoutSavedMultiPartyContext: {
+          kind: 'conversation',
+          conversationId: 'saved-group-conversation-id',
+          title: 'Therapy Group',
+        },
+        therapistBreakoutBusy: false,
+        onTherapistBreakoutToOneToOne: action('therapist-breakout-to-1:1'),
+        onTherapistRejoinSavedMultiParty: action('therapist-rejoin-multiparty'),
+        activeCall: {
+          ...getCommonActiveCallData(),
+          callMode: CallMode.Direct,
+          callState: CallState.Accepted,
+          peekedParticipants: [],
+          remoteAudioLevel: 0,
+          hasRemoteAudio: true,
+          hasRemoteVideo: true,
+          remoteParticipants: [
+            {
+              hasRemoteVideo: true,
+              presenting: false,
+              title: 'Client',
+              serviceId: generateAci(),
+            },
+          ],
+        },
       })}
     />
   );

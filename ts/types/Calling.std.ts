@@ -178,11 +178,12 @@ export type GroupCallRemoteParticipantType = ConversationType & {
 
 export type ConversationsByDemuxIdType = Map<number, ConversationType>;
 
-// Similar to RingRTC's `VideoRequest` but without the `framerate` property.
+// Similar to RingRTC's `VideoRequest` with optional framerate control.
 export type GroupCallVideoRequest = {
   demuxId: number;
   width: number;
   height: number;
+  framerate?: number;
 };
 
 export enum CallingDeviceType {

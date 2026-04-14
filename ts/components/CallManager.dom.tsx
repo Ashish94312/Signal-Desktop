@@ -3,7 +3,7 @@
 
 import React, { useCallback, useEffect } from 'react';
 import lodash from 'lodash';
-import type { VideoFrameSource } from '@signalapp/ringrtc';
+import type { AudioDevice, VideoFrameSource } from '@signalapp/ringrtc';
 import { CallNeedPermissionScreen } from './CallNeedPermissionScreen.dom.tsx';
 import { CallScreen } from './CallScreen.dom.tsx';
 import { CallingLobby } from './CallingLobby.dom.tsx';
@@ -14,6 +14,7 @@ import { IncomingCallBar } from './IncomingCallBar.dom.tsx';
 import type {
   ActiveCallType,
   CallViewMode,
+  ChangeIODevicePayloadType,
   GroupCallConnectionState,
   GroupCallVideoRequest,
 } from '../types/Calling.std.ts';
@@ -23,7 +24,10 @@ import {
   GroupCallJoinState,
 } from '../types/Calling.std.ts';
 import { CallMode } from '../types/CallDisposition.std.ts';
-import type { ConversationType } from '../state/ducks/conversations.preload.ts';
+import type {
+  ConversationType,
+  ShowConversationType,
+} from '../state/ducks/conversations.preload.ts';
 import type {
   AcceptCallType,
   BatchUserActionPayloadType,
@@ -60,6 +64,10 @@ import type { NotificationProfileType } from '../types/NotificationProfile.std.t
 import { strictAssert } from '../util/assert.std.ts';
 import type { SetLocalPreviewContainerType } from '../services/calling.preload.ts';
 import type { ContactModalStateType } from '../types/globalModals.std.ts';
+import { TherapistConsoleModal } from './TherapistConsoleModal.dom.tsx';
+import type { RemoveClientType } from '../types/Calling.std.ts';
+import type { ServiceIdString } from '../types/ServiceId.std.ts';
+import type { SavedMultiPartyContext } from '../types/TherapistBreakout.std.ts';
 
 const { noop } = lodash;
 
@@ -90,10 +98,23 @@ export type CallingImageDataCache = Map<number, ImageData>;
 export type PropsType = {
   activeCall?: ActiveCallType;
   activeNotificationProfile: NotificationProfileType | undefined;
+  addMembersToGroup: (
+    conversationId: string,
+    contactIds: ReadonlyArray<string>,
+    callbacks?: {
+      onFailure?: () => unknown;
+      onSuccess?: () => unknown;
+    }
+  ) => void;
   availableCameras: Array<MediaDeviceInfo>;
+  availableCallLinks: Array<CallLinkType>;
+  availableConversations: Array<ConversationType>;
+  availableMicrophones: Array<AudioDevice>;
+  availableSpeakers: Array<AudioDevice>;
   callLink: CallLinkType | undefined;
   cancelCall: (_: CancelCallType) => void;
   changeCallView: (mode: CallViewMode) => void;
+  changeIODevice: (payload: ChangeIODevicePayloadType) => void;
   closeNeedPermissionScreen: () => void;
   getGroupCallVideoFrameSource: (
     conversationId: string,
@@ -101,12 +122,19 @@ export type PropsType = {
   ) => VideoFrameSource;
   getIsSharingPhoneNumberWithEverybody: () => boolean;
   getPresentingSources: () => void;
+  hideTherapistConsole: () => void;
   isOnline: boolean;
+  isTherapistConsoleVisible: boolean;
+  onCreateCallLink: () => void;
+  onJoinCallLink: (roomId: string) => void;
   ringingCall: DirectIncomingCall | GroupIncomingCall | null;
   renderDeviceSelection: () => React.JSX.Element;
   renderReactionPicker: (
     props: React.ComponentProps<typeof SmartReactionPicker>
   ) => React.JSX.Element;
+  removeClientFromCall: (payload: RemoveClientType) => void;
+  returnToActiveCall: () => void;
+  sendRemoteMute: (demuxId: number) => void;
   showContactModal: (payload: ContactModalStateType) => void;
   startCall: (payload: StartCallType) => void;
   toggleParticipants: () => void;
@@ -128,6 +156,11 @@ export type PropsType = {
   ) => unknown;
   openSystemPreferencesAction: () => unknown;
   playRingtone: () => unknown;
+  selectedCamera?: string;
+  selectedMicrophone?: AudioDevice;
+  selectedSpeaker?: AudioDevice;
+  onStartAudioCall: (conversationId: string) => void;
+  onStartVideoCall: (conversationId: string) => void;
   selectPresentingSource: (id: string) => void;
   sendGroupCallRaiseHand: (payload: SendGroupCallRaiseHandType) => void;
   sendGroupCallReaction: (payload: SendGroupCallReactionType) => void;
@@ -152,7 +185,16 @@ export type PropsType = {
   toggleScreenRecordingPermissionsDialog: () => unknown;
   toggleSelfViewExpanded: () => unknown;
   toggleSettings: () => void;
+  updateCallLinkName: (roomId: string, name: string) => void;
   pauseVoiceNotePlayer: () => void;
+  therapistBreakoutSavedMultiPartyContext?: SavedMultiPartyContext | null;
+  therapistBreakoutBusy?: boolean;
+  onTherapistBreakoutToOneToOne?: (
+    directConversationId: string,
+    recipientServiceId?: ServiceIdString
+  ) => void;
+  onTherapistRejoinSavedMultiParty?: () => void;
+  showConversation: ShowConversationType;
 };
 
 type ActiveCallManagerPropsType = {
@@ -175,13 +217,20 @@ type ActiveCallManagerPropsType = {
 
 function ActiveCallManager({
   activeCall,
+  addMembersToGroup,
+  showConversation,
   approveUser,
   availableCameras,
+  availableCallLinks,
+  availableConversations,
+  availableMicrophones,
+  availableSpeakers,
   batchUserAction,
   callLink,
   cancelCall,
   cancelPresenting,
   changeCallView,
+  changeIODevice,
   closeNeedPermissionScreen,
   denyUser,
   hangUpActiveCall,
@@ -191,9 +240,15 @@ function ActiveCallManager({
   getGroupCallVideoFrameSource,
   getPresentingSources,
   me,
+  hideTherapistConsole,
+  onCreateCallLink,
+  onJoinCallLink,
   openSystemPreferencesAction,
   renderDeviceSelection,
   renderReactionPicker,
+  removeClientFromCall,
+  returnToActiveCall,
+  sendRemoteMute,
   selectPresentingSource,
   sendGroupCallRaiseHand,
   sendGroupCallReaction,
@@ -216,6 +271,17 @@ function ActiveCallManager({
   toggleSelfViewExpanded,
   toggleSettings,
   pauseVoiceNotePlayer,
+  selectedCamera,
+  selectedMicrophone,
+  selectedSpeaker,
+  onStartAudioCall,
+  onStartVideoCall,
+  isTherapistConsoleVisible,
+  updateCallLinkName,
+  therapistBreakoutSavedMultiPartyContext = null,
+  therapistBreakoutBusy = false,
+  onTherapistBreakoutToOneToOne,
+  onTherapistRejoinSavedMultiParty,
 }: ActiveCallManagerPropsType): React.JSX.Element {
   const {
     conversation,
@@ -296,6 +362,20 @@ function ActiveCallManager({
     showShareCallLinkViaSignal(callLink, i18n);
   }, [callLink, i18n, showShareCallLinkViaSignal]);
 
+  const handleOpenCallControls = useCallback(() => {
+    returnToActiveCall();
+    hideTherapistConsole();
+  }, [hideTherapistConsole, returnToActiveCall]);
+
+  const handleEndCallFromTherapistConsole = useCallback(() => {
+    hangUpActiveCall('therapist console end call');
+  }, [hangUpActiveCall]);
+
+  /** Close / Escape / backdrop: leave the call but stay in the therapist workspace shell (do not return to main Signal UI). */
+  const handleTherapistConsoleClose = useCallback(() => {
+    hangUpActiveCall('therapist console close');
+  }, [hangUpActiveCall]);
+
   let isCallFull: boolean;
   let showCallLobby: boolean;
   let groupMembers:
@@ -344,6 +424,63 @@ function ActiveCallManager({
     }
     default:
       throw missingCaseError(activeCall);
+  }
+
+  if (isTherapistConsoleVisible) {
+    return (
+      <TherapistConsoleModal
+        activeCall={activeCall}
+        addMembersToGroup={addMembersToGroup}
+        showConversation={showConversation}
+        availableCameras={availableCameras}
+        availableCallLinks={availableCallLinks}
+        availableConversations={availableConversations}
+        availableMicrophones={availableMicrophones}
+        availableSpeakers={availableSpeakers}
+        changeIODevice={changeIODevice}
+        getGroupCallVideoFrameSource={getGroupCallVideoFrameSourceForActiveCall}
+        i18n={i18n}
+        onApprovePendingParticipant={serviceId => {
+          approveUser({ serviceId });
+        }}
+        onClose={handleTherapistConsoleClose}
+        onCreateCallLink={onCreateCallLink}
+        onDenyPendingParticipant={serviceId => {
+          denyUser({ serviceId });
+        }}
+        onEndCall={handleEndCallFromTherapistConsole}
+        onJoinCallLink={onJoinCallLink}
+        onOpenCallControls={handleOpenCallControls}
+        onRemoteMute={sendRemoteMute}
+        onRemoveParticipant={demuxId => {
+          removeClientFromCall({ demuxId });
+        }}
+        onToggleAudio={() => {
+          setLocalAudio({ enabled: !activeCall.hasLocalAudio });
+        }}
+        onToggleVideo={() => {
+          setLocalVideo({ enabled: !activeCall.hasLocalVideo });
+        }}
+        cancelPresenting={cancelPresenting}
+        setLocalAudio={setLocalAudio}
+        setLocalVideo={setLocalVideo}
+        onUpdateCallLinkName={updateCallLinkName}
+        selectedCamera={selectedCamera}
+        selectedMicrophone={selectedMicrophone}
+        selectedSpeaker={selectedSpeaker}
+        onStartAudioCall={onStartAudioCall}
+        onStartVideoCall={onStartVideoCall}
+        setGroupCallVideoRequest={setGroupCallVideoRequestForConversation}
+        setLocalPreviewContainer={setLocalPreviewContainer}
+        setRendererCanvas={setRendererCanvas}
+        showShareCallLinkViaSignal={showShareCallLinkViaSignal}
+        startCall={startCall}
+        savedMultiPartyContext={therapistBreakoutSavedMultiPartyContext}
+        breakoutBusy={therapistBreakoutBusy}
+        onBreakoutToOneToOne={onTherapistBreakoutToOneToOne}
+        onRejoinSavedMultiParty={onTherapistRejoinSavedMultiParty}
+      />
+    );
   }
 
   if (pip) {
@@ -536,8 +673,13 @@ export function CallManager({
   acceptCall,
   activeCall,
   activeNotificationProfile,
+  addMembersToGroup,
   approveUser,
   availableCameras,
+  availableCallLinks,
+  availableConversations,
+  availableMicrophones,
+  availableSpeakers,
   batchUserAction,
   bounceAppIconStart,
   bounceAppIconStop,
@@ -545,6 +687,7 @@ export function CallManager({
   cancelCall,
   cancelPresenting,
   changeCallView,
+  changeIODevice,
   closeNeedPermissionScreen,
   declineCall,
   denyUser,
@@ -552,17 +695,29 @@ export function CallManager({
   getPresentingSources,
   hangUpActiveCall,
   hasInitialLoadCompleted,
+  hideTherapistConsole,
   i18n,
   isOnline,
+  isTherapistConsoleVisible,
   getIsSharingPhoneNumberWithEverybody,
   me,
   notifyForCall,
+  onCreateCallLink,
+  onJoinCallLink,
   openSystemPreferencesAction,
   pauseVoiceNotePlayer,
   playRingtone,
   renderDeviceSelection,
   renderReactionPicker,
+  removeClientFromCall,
   ringingCall,
+  returnToActiveCall,
+  sendRemoteMute,
+  selectedCamera,
+  selectedMicrophone,
+  selectedSpeaker,
+  onStartAudioCall,
+  onStartVideoCall,
   selectPresentingSource,
   sendGroupCallRaiseHand,
   sendGroupCallReaction,
@@ -586,6 +741,12 @@ export function CallManager({
   toggleScreenRecordingPermissionsDialog,
   toggleSelfViewExpanded,
   toggleSettings,
+  updateCallLinkName,
+  therapistBreakoutSavedMultiPartyContext = null,
+  therapistBreakoutBusy = false,
+  onTherapistBreakoutToOneToOne,
+  onTherapistRejoinSavedMultiParty,
+  showConversation,
 }: PropsType): React.JSX.Element | null {
   const isCallActive = Boolean(activeCall);
   useEffect(() => {
@@ -656,28 +817,47 @@ export function CallManager({
       <CallingToastProvider i18n={i18n}>
         <ActiveCallManager
           activeCall={activeCall}
+          addMembersToGroup={addMembersToGroup}
+          showConversation={showConversation}
           availableCameras={availableCameras}
+          availableCallLinks={availableCallLinks}
+          availableConversations={availableConversations}
+          availableMicrophones={availableMicrophones}
+          availableSpeakers={availableSpeakers}
           approveUser={approveUser}
           batchUserAction={batchUserAction}
           callLink={callLink}
           cancelCall={cancelCall}
           cancelPresenting={cancelPresenting}
           changeCallView={changeCallView}
+          changeIODevice={changeIODevice}
           closeNeedPermissionScreen={closeNeedPermissionScreen}
           denyUser={denyUser}
           getGroupCallVideoFrameSource={getGroupCallVideoFrameSource}
           getPresentingSources={getPresentingSources}
           hangUpActiveCall={hangUpActiveCall}
+          hideTherapistConsole={hideTherapistConsole}
           i18n={i18n}
           isOnline={isOnline}
+          isTherapistConsoleVisible={isTherapistConsoleVisible}
           getIsSharingPhoneNumberWithEverybody={
             getIsSharingPhoneNumberWithEverybody
           }
           me={me}
+          onCreateCallLink={onCreateCallLink}
+          onJoinCallLink={onJoinCallLink}
           openSystemPreferencesAction={openSystemPreferencesAction}
           pauseVoiceNotePlayer={pauseVoiceNotePlayer}
           renderDeviceSelection={renderDeviceSelection}
           renderReactionPicker={renderReactionPicker}
+          removeClientFromCall={removeClientFromCall}
+          returnToActiveCall={returnToActiveCall}
+          sendRemoteMute={sendRemoteMute}
+          selectedCamera={selectedCamera}
+          selectedMicrophone={selectedMicrophone}
+          selectedSpeaker={selectedSpeaker}
+          onStartAudioCall={onStartAudioCall}
+          onStartVideoCall={onStartVideoCall}
           selectPresentingSource={selectPresentingSource}
           sendGroupCallRaiseHand={sendGroupCallRaiseHand}
           sendGroupCallReaction={sendGroupCallReaction}
@@ -703,6 +883,13 @@ export function CallManager({
           }
           toggleSelfViewExpanded={toggleSelfViewExpanded}
           toggleSettings={toggleSettings}
+          updateCallLinkName={updateCallLinkName}
+          therapistBreakoutSavedMultiPartyContext={
+            therapistBreakoutSavedMultiPartyContext
+          }
+          therapistBreakoutBusy={therapistBreakoutBusy}
+          onTherapistBreakoutToOneToOne={onTherapistBreakoutToOneToOne}
+          onTherapistRejoinSavedMultiParty={onTherapistRejoinSavedMultiParty}
         />
       </CallingToastProvider>
     );

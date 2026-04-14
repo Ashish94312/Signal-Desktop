@@ -26,6 +26,8 @@ const setupAsStandalone = stub();
 const showAbout = stub();
 const showDebugLog = stub();
 const showKeyboardShortcuts = stub();
+const showTherapistConsole = stub();
+const simulateMimoMetadata = stub();
 const showSettings = stub();
 const showWindow = stub();
 const stageLocalBackupForImport = stub();
@@ -70,6 +72,9 @@ const getExpectedViewMenu = (): MenuItemConstructorOptions => ({
     { accelerator: 'CmdOrCtrl+-', label: 'Zoom Out', click: zoomOut },
     { type: 'separator' },
     { label: 'Toggle Full Screen', role: 'togglefullscreen' },
+    { type: 'separator' },
+    { label: 'Signal Therapist Console', click: showTherapistConsole },
+    { label: 'Simulate MiMo metadata (demo)', click: simulateMimoMetadata },
     { type: 'separator' },
     { label: 'Debug Log', click: showDebugLog },
     { type: 'separator' },
@@ -237,6 +242,8 @@ describe('createTemplate', () => {
     showAbout,
     showDebugLog,
     showKeyboardShortcuts,
+    showTherapistConsole,
+    simulateMimoMetadata,
     showSettings,
     showWindow,
     stageLocalBackupForImport,

@@ -44,6 +44,7 @@ import {
 import { SmartPinMessageDialog } from './PinMessageDialog.preload.tsx';
 import { SmartGroupMemberLabelInfoModal } from './GroupMemberLabelInfoModal.preload.tsx';
 import { SmartTerminateGroupFailedModal } from './TerminateGroupFailedModal.preload.tsx';
+import { SmartTherapistConsole } from './TherapistConsole.preload.tsx';
 
 function renderCallLinkAddNameModal(): React.JSX.Element {
   return <SmartCallLinkAddNameModal />;
@@ -188,6 +189,7 @@ export const SmartGlobalModalContainer = memo(
       profileNameWarningModalConversationType,
       isShortcutGuideModalVisible,
       isSignalConnectionsVisible,
+      isTherapistConsoleVisible,
       isStoriesSettingsVisible,
       isKeyTransparencyErrorVisible,
       isKeyTransparencyOnboardingVisible,
@@ -285,110 +287,119 @@ export const SmartGlobalModalContainer = memo(
     );
 
     return (
-      <GlobalModalContainer
-        addUserToAnotherGroupModalContactId={
-          addUserToAnotherGroupModalContactId
-        }
-        backfillFailureModalProps={backfillFailureModalProps}
-        callLinkAddNameModalRoomId={callLinkAddNameModalRoomId}
-        callLinkEditModalRoomId={callLinkEditModalRoomId}
-        callQualitySurveyProps={callQualitySurveyProps}
-        renderCallQualitySurvey={renderCallQualitySurvey}
-        callLinkPendingParticipantContactId={
-          callLinkPendingParticipantContactId
-        }
-        confirmLeaveCallModalState={confirmLeaveCallModalState}
-        contactModalState={contactModalState}
-        criticalIdlePrimaryDeviceModal={criticalIdlePrimaryDeviceModal}
-        debugLogErrorModalProps={debugLogErrorModalProps}
-        editHistoryMessages={editHistoryMessages}
-        editNicknameAndNoteModalProps={editNicknameAndNoteModalProps}
-        errorModalProps={errorModalProps}
-        deleteMessagesProps={deleteMessagesProps}
-        discardDraftDialogProps={discardDraftDialogProps}
-        draftGifMessageSendModalProps={draftGifMessageSendModalProps}
-        forwardMessagesProps={forwardMessagesProps}
-        groupMemberLabelInfoModalState={groupMemberLabelInfoModalState}
-        hideCriticalIdlePrimaryDeviceModal={hideCriticalIdlePrimaryDeviceModal}
-        hideLowDiskSpaceBackupImportModal={hideLowDiskSpaceBackupImportModal}
-        lowDiskSpaceBackupImportModal={lowDiskSpaceBackupImportModal}
-        terminateGroupFailedModal={terminateGroupFailedModal}
-        messageRequestActionsConfirmationProps={
-          messageRequestActionsConfirmationProps
-        }
-        mediaPermissionsModalProps={mediaPermissionsModalProps}
-        closeMediaPermissionsModal={closeMediaPermissionsModal}
-        openSystemMediaPermissions={window.IPC.openSystemMediaPermissions}
-        notePreviewModalProps={notePreviewModalProps}
-        pinMessageDialogData={pinMessageDialogData}
-        hasSafetyNumberChangeModal={hasSafetyNumberChangeModal}
-        hideBackfillFailureModal={hideBackfillFailureModal}
-        hideUserNotFoundModal={hideUserNotFoundModal}
-        hideWhatsNewModal={hideWhatsNewModal}
-        hideKeyTransparencyOnboardingDialog={
-          hideKeyTransparencyOnboardingDialog
-        }
-        finishKeyTransparencyOnboarding={finishKeyTransparencyOnboarding}
-        hideTapToViewNotAvailableModal={hideTapToViewNotAvailableModal}
-        i18n={i18n}
-        isAboutContactModalVisible={aboutContactModalState != null}
-        isKeyTransparencyErrorVisible={isKeyTransparencyErrorVisible}
-        isKeyTransparencyOnboardingVisible={isKeyTransparencyOnboardingVisible}
-        isProfileNameWarningModalVisible={isProfileNameWarningModalVisible}
-        isShortcutGuideModalVisible={isShortcutGuideModalVisible}
-        isSignalConnectionsVisible={isSignalConnectionsVisible}
-        isStoriesSettingsVisible={isStoriesSettingsVisible}
-        isWhatsNewVisible={isWhatsNewVisible}
-        renderAboutContactModal={renderAboutContactModal}
-        renderAddUserToAnotherGroup={renderAddUserToAnotherGroup}
-        renderCallLinkAddNameModal={renderCallLinkAddNameModal}
-        renderCallLinkEditModal={renderCallLinkEditModal}
-        renderCallLinkPendingParticipantModal={
-          renderCallLinkPendingParticipantModal
-        }
-        renderConfirmLeaveCallModal={renderConfirmLeaveCallModal}
-        renderContactModal={renderContactModal}
-        renderDebugLogErrorModal={renderDebugLogErrorModal}
-        renderEditHistoryMessagesModal={renderEditHistoryMessagesModal}
-        renderEditNicknameAndNoteModal={renderEditNicknameAndNoteModal}
-        renderErrorModal={renderErrorModal}
-        renderDeleteMessagesModal={renderDeleteMessagesModal}
-        renderDiscardDraftDialog={renderDiscardDraftDialog}
-        renderDraftGifMessageSendModal={renderDraftGifMessageSendModal}
-        renderForwardMessagesModal={renderForwardMessagesModal}
-        renderGroupMemberLabelInfoModal={renderGroupMemberLabelInfoModal}
-        renderKeyTransparencyErrorDialog={renderKeyTransparencyErrorDialog}
-        renderMessageRequestActionsConfirmation={
-          renderMessageRequestActionsConfirmation
-        }
-        renderNotePreviewModal={renderNotePreviewModal}
-        renderPinMessageDialog={renderPinMessageDialog}
-        renderPlaintextExportWorkflow={renderPlaintextExportWorkflow}
-        renderLocalBackupExportWorkflow={renderLocalBackupExportWorkflow}
-        renderProfileNameWarningModal={renderProfileNameWarningModal}
-        renderUsernameOnboarding={renderUsernameOnboarding}
-        renderSafetyNumber={renderSafetyNumber}
-        renderSendAnywayDialog={renderSendAnywayDialog}
-        renderShortcutGuideModal={renderShortcutGuideModal}
-        renderStickerPreviewModal={renderStickerPreviewModal}
-        renderStoriesSettings={renderStoriesSettings}
-        renderTerminateGroupFailedModal={renderTerminateGroupFailedModal}
-        safetyNumberChangedBlockingData={safetyNumberChangedBlockingData}
-        safetyNumberModalContactId={safetyNumberModalContactId}
-        shouldShowPlaintextExportWorkflow={shouldShowPlaintextExportWorkflow}
-        shouldShowLocalBackupExportWorkflow={
-          shouldShowLocalBackupExportWorkflow
-        }
-        stickerPackPreviewId={stickerPackPreviewId}
-        tapToViewNotAvailableModalProps={tapToViewNotAvailableModalProps}
-        theme={theme}
-        toggleSignalConnectionsModal={toggleSignalConnectionsModal}
-        userNotFoundModalState={userNotFoundModalState}
-        usernameOnboardingState={usernameOnboardingState}
-        profileNameWarningModalConversationType={
-          profileNameWarningModalConversationType
-        }
-      />
+      <>
+        {isTherapistConsoleVisible ? (
+          <SmartTherapistConsole />
+        ) : null}
+        <GlobalModalContainer
+          addUserToAnotherGroupModalContactId={
+            addUserToAnotherGroupModalContactId
+          }
+          backfillFailureModalProps={backfillFailureModalProps}
+          callLinkAddNameModalRoomId={callLinkAddNameModalRoomId}
+          callLinkEditModalRoomId={callLinkEditModalRoomId}
+          callQualitySurveyProps={callQualitySurveyProps}
+          renderCallQualitySurvey={renderCallQualitySurvey}
+          callLinkPendingParticipantContactId={
+            callLinkPendingParticipantContactId
+          }
+          confirmLeaveCallModalState={confirmLeaveCallModalState}
+          contactModalState={contactModalState}
+          criticalIdlePrimaryDeviceModal={criticalIdlePrimaryDeviceModal}
+          debugLogErrorModalProps={debugLogErrorModalProps}
+          editHistoryMessages={editHistoryMessages}
+          editNicknameAndNoteModalProps={editNicknameAndNoteModalProps}
+          errorModalProps={errorModalProps}
+          deleteMessagesProps={deleteMessagesProps}
+          discardDraftDialogProps={discardDraftDialogProps}
+          draftGifMessageSendModalProps={draftGifMessageSendModalProps}
+          forwardMessagesProps={forwardMessagesProps}
+          groupMemberLabelInfoModalState={groupMemberLabelInfoModalState}
+          hideCriticalIdlePrimaryDeviceModal={
+            hideCriticalIdlePrimaryDeviceModal
+          }
+          hideLowDiskSpaceBackupImportModal={hideLowDiskSpaceBackupImportModal}
+          lowDiskSpaceBackupImportModal={lowDiskSpaceBackupImportModal}
+          terminateGroupFailedModal={terminateGroupFailedModal}
+          messageRequestActionsConfirmationProps={
+            messageRequestActionsConfirmationProps
+          }
+          mediaPermissionsModalProps={mediaPermissionsModalProps}
+          closeMediaPermissionsModal={closeMediaPermissionsModal}
+          openSystemMediaPermissions={window.IPC.openSystemMediaPermissions}
+          notePreviewModalProps={notePreviewModalProps}
+          pinMessageDialogData={pinMessageDialogData}
+          hasSafetyNumberChangeModal={hasSafetyNumberChangeModal}
+          hideBackfillFailureModal={hideBackfillFailureModal}
+          hideUserNotFoundModal={hideUserNotFoundModal}
+          hideWhatsNewModal={hideWhatsNewModal}
+          hideKeyTransparencyOnboardingDialog={
+            hideKeyTransparencyOnboardingDialog
+          }
+          finishKeyTransparencyOnboarding={finishKeyTransparencyOnboarding}
+          hideTapToViewNotAvailableModal={hideTapToViewNotAvailableModal}
+          i18n={i18n}
+          isAboutContactModalVisible={aboutContactModalState != null}
+          isKeyTransparencyErrorVisible={isKeyTransparencyErrorVisible}
+          isKeyTransparencyOnboardingVisible={
+            isKeyTransparencyOnboardingVisible
+          }
+          isProfileNameWarningModalVisible={isProfileNameWarningModalVisible}
+          isShortcutGuideModalVisible={isShortcutGuideModalVisible}
+          isSignalConnectionsVisible={isSignalConnectionsVisible}
+          isStoriesSettingsVisible={isStoriesSettingsVisible}
+          isWhatsNewVisible={isWhatsNewVisible}
+          renderAboutContactModal={renderAboutContactModal}
+          renderAddUserToAnotherGroup={renderAddUserToAnotherGroup}
+          renderCallLinkAddNameModal={renderCallLinkAddNameModal}
+          renderCallLinkEditModal={renderCallLinkEditModal}
+          renderCallLinkPendingParticipantModal={
+            renderCallLinkPendingParticipantModal
+          }
+          renderConfirmLeaveCallModal={renderConfirmLeaveCallModal}
+          renderContactModal={renderContactModal}
+          renderDebugLogErrorModal={renderDebugLogErrorModal}
+          renderEditHistoryMessagesModal={renderEditHistoryMessagesModal}
+          renderEditNicknameAndNoteModal={renderEditNicknameAndNoteModal}
+          renderErrorModal={renderErrorModal}
+          renderDeleteMessagesModal={renderDeleteMessagesModal}
+          renderDiscardDraftDialog={renderDiscardDraftDialog}
+          renderDraftGifMessageSendModal={renderDraftGifMessageSendModal}
+          renderForwardMessagesModal={renderForwardMessagesModal}
+          renderGroupMemberLabelInfoModal={renderGroupMemberLabelInfoModal}
+          renderKeyTransparencyErrorDialog={renderKeyTransparencyErrorDialog}
+          renderMessageRequestActionsConfirmation={
+            renderMessageRequestActionsConfirmation
+          }
+          renderNotePreviewModal={renderNotePreviewModal}
+          renderPinMessageDialog={renderPinMessageDialog}
+          renderPlaintextExportWorkflow={renderPlaintextExportWorkflow}
+          renderLocalBackupExportWorkflow={renderLocalBackupExportWorkflow}
+          renderProfileNameWarningModal={renderProfileNameWarningModal}
+          renderUsernameOnboarding={renderUsernameOnboarding}
+          renderSafetyNumber={renderSafetyNumber}
+          renderSendAnywayDialog={renderSendAnywayDialog}
+          renderShortcutGuideModal={renderShortcutGuideModal}
+          renderStickerPreviewModal={renderStickerPreviewModal}
+          renderStoriesSettings={renderStoriesSettings}
+          renderTerminateGroupFailedModal={renderTerminateGroupFailedModal}
+          safetyNumberChangedBlockingData={safetyNumberChangedBlockingData}
+          safetyNumberModalContactId={safetyNumberModalContactId}
+          shouldShowPlaintextExportWorkflow={shouldShowPlaintextExportWorkflow}
+          shouldShowLocalBackupExportWorkflow={
+            shouldShowLocalBackupExportWorkflow
+          }
+          stickerPackPreviewId={stickerPackPreviewId}
+          tapToViewNotAvailableModalProps={tapToViewNotAvailableModalProps}
+          theme={theme}
+          toggleSignalConnectionsModal={toggleSignalConnectionsModal}
+          userNotFoundModalState={userNotFoundModalState}
+          usernameOnboardingState={usernameOnboardingState}
+          profileNameWarningModalConversationType={
+            profileNameWarningModalConversationType
+          }
+        />
+      </>
     );
   }
 );

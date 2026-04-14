@@ -203,6 +203,10 @@ import { createLogger } from './logging/log.std.ts';
 import { deleteAllLogs } from './util/deleteAllLogs.preload.ts';
 import { startInteractionMode } from './services/InteractionMode.dom.ts';
 import { calling } from './services/calling.preload.ts';
+import {
+  forwardIncomingMiMoMessage,
+  isMiMoMessageBody,
+} from './services/mimoMessageHandler.preload.ts';
 import { ReactionSource } from './reactions/ReactionSource.std.ts';
 import { singleProtoJobQueue } from './jobs/singleProtoJobQueue.preload.ts';
 import { SeenStatus } from './MessageSeenStatus.std.ts';
@@ -1616,7 +1620,7 @@ export async function startApp(): Promise<void> {
             log.info(
               'offline, but app has been registered before; opening inbox'
             );
-            window.reduxActions.app.openInbox();
+            openInboxThenTherapistConsole('offline installer');
           } else if (state.installer.step === InstallScreenStep.BackupImport) {
             log.warn('offline, but app has needs to import backup');
             // TODO: DESKTOP-7584
@@ -1645,6 +1649,35 @@ export async function startApp(): Promise<void> {
   let authSocketConnectCount = 0;
   let afterAuthSocketConnectPromise: ExplodePromiseResultType<void> | undefined;
   let remotelyExpired = false;
+
+  /** Therapist build: land in Session Console after linking, not only the default inbox. */
+  function openInboxThenTherapistConsole(logContext: string): void {
+    log.info(`${logContext}: opening inbox, then therapist console`);
+    void window.reduxActions.app.openInbox();
+
+    let attempts = 0;
+    const maxAttempts = 200;
+    const showWhenInboxReady = () => {
+      const state = window.reduxStore.getState();
+      if (state.app.appView === AppViewType.Inbox) {
+        window.reduxActions.globalModals.showTherapistConsole();
+        return;
+      }
+
+      attempts += 1;
+      if (attempts >= maxAttempts) {
+        log.warn(
+          `${logContext}: inbox not ready after ${maxAttempts} attempts; showing therapist console anyway`
+        );
+        window.reduxActions.globalModals.showTherapistConsole();
+        return;
+      }
+
+      setTimeout(showWhenInboxReady, 50);
+    };
+
+    showWhenInboxReady();
+  }
 
   async function afterAuthSocketConnect() {
     let contactSyncComplete: Promise<void> | undefined;
@@ -1770,11 +1803,11 @@ export async function startApp(): Promise<void> {
         }
       }
 
-      // 8. Show inbox
+      // 8. Show inbox (therapist build: then open Session Console)
       const state = window.reduxStore.getState();
       if (state.app.appView === AppViewType.Installer) {
         log.info(`${logId}: switching from installer to inbox`);
-        window.reduxActions.app.openInbox();
+        openInboxThenTherapistConsole(logId);
       }
 
       // 9. Start services requiring auth connection
@@ -2457,6 +2490,11 @@ export async function startApp(): Promise<void> {
         confirm,
         messageDescriptor,
       });
+    }
+
+    if (isMiMoMessageBody(data.message.body)) {
+      forwardIncomingMiMoMessage(data, confirm);
+      return;
     }
 
     const message = initIncomingMessage(data, messageDescriptor);

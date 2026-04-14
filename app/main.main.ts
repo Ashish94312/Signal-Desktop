@@ -76,6 +76,8 @@ import * as attachmentChannel from './attachment_channel.main.ts';
 import * as bounce from '../ts/services/bounce.main.ts';
 import * as updater from '../ts/updater/index.main.ts';
 import { updateDefaultSession } from './updateDefaultSession.main.ts';
+import { startMimoIngestHttpServer } from './mimo_ingest_http.main.ts';
+import { startMimoRelayPoller } from './mimo_relay_poller.main.ts';
 import { PreventDisplaySleepService } from './PreventDisplaySleepService.std.ts';
 import {
   SystemTrayService,
@@ -158,6 +160,9 @@ let mainWindow: BrowserWindow | undefined;
 let mainWindowCreated = false;
 let loadingWindow: BrowserWindow | undefined;
 
+/** Signal ACI for MiMo `clientSessionId` (GET /mimo-local-session for ReLive bridge). */
+let cachedMiMoLocalClientSessionId: string | undefined;
+
 // These will be set after app fires the 'ready' event
 let preferredSystemLocales: Array<string> | undefined;
 let localeOverride: string | null | undefined;
@@ -227,7 +232,6 @@ const FORCE_ENABLE_CRASH_REPORTS = process.argv.some(
 const DISABLE_SCREEN_SECURITY = process.argv.some(
   arg => arg === '--disable-screen-security'
 );
-
 const CLI_LANG = cliOptions.lang as string | undefined;
 
 setupCrashReports(log, showDebugLogWindow, FORCE_ENABLE_CRASH_REPORTS);
@@ -695,7 +699,8 @@ async function createWindow() {
     systemTraySetting === SystemTraySetting.MinimizeToAndStartInSystemTray;
 
   const shouldShowWindow =
-    !app.getLoginItemSettings().wasOpenedAsHidden && !startInTray;
+    !app.getLoginItemSettings().wasOpenedAsHidden &&
+    !startInTray;
 
   const windowOptions: Electron.BrowserWindowConstructorOptions = {
     show: false,
@@ -784,6 +789,13 @@ async function createWindow() {
   if (systemTrayService) {
     systemTrayService.setMainWindow(mainWindow);
   }
+
+  startMimoIngestHttpServer({
+    getMainWindow: () => mainWindow,
+    getLocalClientSessionId: () => cachedMiMoLocalClientSessionId,
+  });
+
+  startMimoRelayPoller({ getMainWindow: () => mainWindow });
 
   function saveWindowStats() {
     if (!windowConfig) {
@@ -1036,6 +1048,18 @@ async function createWindow() {
       : await prepareFileUrl([rootDir, 'background.html'])
   );
 }
+
+ipc.handle('mimo:set-local-client-session-id', (_event, id: unknown) => {
+  if (id === null || id === undefined) {
+    cachedMiMoLocalClientSessionId = undefined;
+    return;
+  }
+  if (typeof id !== 'string') {
+    return;
+  }
+  const trimmed = id.trim();
+  cachedMiMoLocalClientSessionId = trimmed.length > 0 ? trimmed : undefined;
+});
 
 // Renderer asks if we are done with the database
 ipc.handle('database-ready', async () => {
@@ -1304,6 +1328,46 @@ async function showScreenShareWindow(sourceName: string | undefined) {
     screenShareWindow,
     await prepareFileUrl([rootDir, 'screenShare.html'], { sourceName })
   );
+}
+
+async function showTherapistConsole() {
+  if (!mainWindow) {
+    return;
+  }
+
+  showWindow();
+  const sendShowTherapistConsole = () => {
+    mainWindow?.webContents.send('show-therapist-console');
+  };
+
+  if (mainWindow.webContents.isLoading()) {
+    mainWindow.webContents.once('did-finish-load', sendShowTherapistConsole);
+    return;
+  }
+
+  sendShowTherapistConsole();
+}
+
+function simulateMimoMetadata() {
+  if (!mainWindow) {
+    return;
+  }
+
+  showWindow();
+  const send = () => {
+    mainWindow?.webContents.send('mimo-ingest-metadata', {
+      clientSessionId: 'demo-client-1',
+      gameId: 'demo-game-module',
+      heartbeatUnixMs: Date.now(),
+    });
+  };
+
+  if (mainWindow.webContents.isLoading()) {
+    mainWindow.webContents.once('did-finish-load', send);
+    return;
+  }
+
+  send();
 }
 
 let aboutWindow: BrowserWindow | undefined;
@@ -2400,6 +2464,8 @@ function setupMenu(options?: Partial<CreateTemplateOptionsType>) {
     showAbout,
     showDebugLog: showDebugLogWindow,
     showKeyboardShortcuts,
+    showTherapistConsole,
+    simulateMimoMetadata,
     showSettings: () => {
       if (!settingsChannel) {
         log.warn(
@@ -2605,7 +2671,7 @@ app.on('activate', () => {
   // On OS X it's common to re-create a window in the app when the
   // dock icon is clicked and there are no other windows open.
   if (mainWindow) {
-    mainWindow.show();
+    showWindow();
   } else {
     drop(createWindow());
   }
@@ -3152,6 +3218,24 @@ ipc.handle(
     }
   }
 );
+
+ipc.handle('open-external-url', async (_event, rawTarget: string) => {
+  const parsedUrl = maybeParseUrl(rawTarget);
+  if (!parsedUrl) {
+    throw new Error('Invalid URL');
+  }
+
+  const { protocol } = parsedUrl;
+  if (
+    protocol !== 'https:' &&
+    protocol !== 'http:' &&
+    protocol !== 'rustdesk:'
+  ) {
+    throw new Error(`Protocol not allowed: ${protocol}`);
+  }
+
+  await shell.openExternal(rawTarget);
+});
 
 ipc.handle('get-auto-launch', async () => {
   return app.getLoginItemSettings(await getDefaultLoginItemSettings())

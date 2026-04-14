@@ -18,6 +18,7 @@ release/
 /sql/
 /start.sh
 .stylelintcache
+.env.mimo
 tsconfig.tsbuildinfo
 .smartling-source.sh
 
