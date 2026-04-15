@@ -16,8 +16,11 @@ import type { LocalizerType } from '../types/Util.std.ts';
 import { nonRenderedRemoteParticipant } from '../util/ringrtc/nonRenderedRemoteParticipant.std.ts';
 import {
   CS,
+  TRIAGE_TILE_KEYFRAMES,
   csVideoTile,
   csVideoTileGrid,
+  csVideoTileLabel,
+  csVideoTileOverlay,
 } from './therapistConsoleClinicalSerenity.std.ts';
 import type { MiMoClientSnapshotType } from '../types/MiMoMetadata.std.ts';
 import { getWorstMiMoAlertSeverity } from '../util/mimoAlertTriage.std.ts';
@@ -167,6 +170,7 @@ type TilePropsType = {
   isCallReconnecting: boolean;
   isSelected: boolean;
   joinedAt: number | null;
+  mimoSnap?: MiMoClientSnapshotType | null;
   mimoWorst: 'red' | 'yellow' | 'green' | null;
   onClick: (demuxId: number) => void;
   onDoubleClick: (demuxId: number) => void;
@@ -186,6 +190,7 @@ const VideoTile = React.memo(function VideoTileInner({
   isCallReconnecting,
   isSelected,
   joinedAt,
+  mimoSnap,
   mimoWorst,
   onClick,
   onDoubleClick,
@@ -202,6 +207,17 @@ const VideoTile = React.memo(function VideoTileInner({
     () => onDoubleClick(participant.demuxId),
     [onDoubleClick, participant.demuxId]
   );
+
+  const connectivityColor =
+    mimoSnap?.connectivityState === 'online'
+      ? CS.success
+      : mimoSnap?.connectivityState === 'reconnecting'
+        ? CS.warning
+        : mimoSnap?.connectivityState === 'offline'
+          ? CS.critical
+          : null;
+  const gameLabel = mimoSnap?.gameId ?? mimoSnap?.currentModule ?? null;
+  const showOverlay = connectivityColor !== null || gameLabel !== null;
 
   return (
     <div
@@ -224,6 +240,26 @@ const VideoTile = React.memo(function VideoTileInner({
         remoteParticipantsCount={remoteParticipantsCount}
         width={tileWidth}
       />
+      {showOverlay && (
+        <div style={csVideoTileOverlay()}>
+          {connectivityColor !== null ? (
+            <span
+              style={{
+                width: 7,
+                height: 7,
+                borderRadius: '50%',
+                background: connectivityColor,
+                flexShrink: 0,
+              }}
+            />
+          ) : (
+            <span />
+          )}
+          {gameLabel !== null ? (
+            <span style={csVideoTileLabel()}>{gameLabel}</span>
+          ) : null}
+        </div>
+      )}
     </div>
   );
 });
@@ -505,7 +541,9 @@ export function TherapistVideoTileGrid({
   }
 
   return (
-    <div ref={gridRef} style={gridStyle}>
+    <>
+      <style>{TRIAGE_TILE_KEYFRAMES}</style>
+      <div ref={gridRef} style={gridStyle}>
       {visibleParticipants.map(participant => {
         const snap =
           mimoClients &&
@@ -523,6 +561,7 @@ export function TherapistVideoTileGrid({
             isCallReconnecting={isCallReconnecting}
             isSelected={String(participant.demuxId) === selectedSessionId}
             joinedAt={joinedAt}
+            mimoSnap={snap}
             mimoWorst={mimoWorst}
             onClick={handleClick}
             onDoubleClick={handleDoubleClick}
@@ -534,6 +573,7 @@ export function TherapistVideoTileGrid({
         );
       })}
     </div>
+    </>
   );
 }
 

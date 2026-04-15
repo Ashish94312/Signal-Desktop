@@ -57,7 +57,8 @@ export type MiMoOutgoingMessageType =
   | Readonly<{
       kind: 'breakout_direct_invite';
       pausedSessionTitle?: string | null;
-    }>;
+    }>
+  | Readonly<{ kind: 'therapist_prompt'; text: string }>;
 
 export type MiMoMessageType = MiMoIncomingMessageType | MiMoOutgoingMessageType;
 

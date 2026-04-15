@@ -31,6 +31,16 @@ export async function sendBreakoutDirectInvite(
   });
 }
 
+export async function sendTherapistPrompt(
+  recipientServiceId: ServiceIdString,
+  text: string
+): Promise<void> {
+  await sendMiMoMessage(recipientServiceId, {
+    kind: 'therapist_prompt',
+    text,
+  });
+}
+
 export async function sendRemoteControlRequest(
   recipientClientSessionId: string
 ): Promise<void> {

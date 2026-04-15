@@ -762,6 +762,21 @@ export function csVideoTileGrid(compact: boolean): CSSProperties {
   };
 }
 
+/**
+ * CSS keyframes for triage tile animations. Inject once via a <style> element
+ * in TherapistVideoTileGrid.
+ */
+export const TRIAGE_TILE_KEYFRAMES = `
+  @keyframes mimoCriticalPulse {
+    0%,100% { box-shadow: 0 0 0 2px #C0444480; }
+    50%     { box-shadow: 0 0 0 6px #C0444408; }
+  }
+  @keyframes mimoWarningPulse {
+    0%,100% { box-shadow: 0 0 0 2px #B8700E60; }
+    50%     { box-shadow: 0 0 0 5px #B8700E08; }
+  }
+`;
+
 export function csVideoTile(
   selected: boolean,
   compact: boolean,
@@ -770,6 +785,10 @@ export function csVideoTile(
   const defaultBorder = `1px solid rgba(255, 255, 255, 0.08)`;
   let border: string;
   let boxShadow: string;
+  let animationName: string | undefined;
+  let animationDuration: string | undefined;
+  let animationTimingFunction: string | undefined;
+  let animationIterationCount: string | undefined;
 
   if (selected) {
     border = `2px solid ${CS.primary}`;
@@ -783,9 +802,17 @@ export function csVideoTile(
   } else if (mimoWorst === 'red') {
     border = `2px solid ${CS.critical}`;
     boxShadow = CS.shadow1;
+    animationName = 'mimoCriticalPulse';
+    animationDuration = '2s';
+    animationTimingFunction = 'ease-in-out';
+    animationIterationCount = 'infinite';
   } else if (mimoWorst === 'yellow') {
     border = `2px solid ${CS.warning}`;
     boxShadow = CS.shadow1;
+    animationName = 'mimoWarningPulse';
+    animationDuration = '3s';
+    animationTimingFunction = 'ease-in-out';
+    animationIterationCount = 'infinite';
   } else if (mimoWorst === 'green') {
     border = `1px solid ${CS.success}`;
     boxShadow = CS.shadow1;
@@ -804,6 +831,10 @@ export function csVideoTile(
     aspectRatio: '4 / 3',
     transition: `border-color ${CS.transitionFast}, box-shadow ${CS.transitionFast}`,
     boxShadow,
+    animationName,
+    animationDuration,
+    animationTimingFunction,
+    animationIterationCount,
   };
 }
 

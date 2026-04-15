@@ -269,6 +269,8 @@ type PropsType = {
   /** Saved room to offer “Rejoin” after breakout to direct 1:1. */
   savedMultiPartyContext?: SavedMultiPartyContext | null;
   breakoutBusy?: boolean;
+  /** Send a plain-text prompt to the selected client — shown as an overlay on the client device. */
+  onSendTherapistPrompt?: (recipientServiceId: ServiceIdString, text: string) => void;
   /** Syncs global chat selection so timeline loads and SmartTimeline renders (Session Console Messages tab). */
   showConversation: ShowConversationType;
 };
@@ -682,6 +684,7 @@ export function TherapistConsoleModal({
   onJoinCallLink,
   onOpenCallControls,
   onRejoinSavedMultiParty,
+  onSendTherapistPrompt,
   onRemoteMute,
   onRemoveParticipant,
   onStartAudioCall,
@@ -752,6 +755,7 @@ export function TherapistConsoleModal({
     string | null
   >(null);
   const [editingCallLinkName, setEditingCallLinkName] = useState('');
+  const [therapistPromptText, setTherapistPromptText] = useState('');
 
   const [mediaAccess, setMediaAccess] = useState<MediaAccessState>({
     camera: 'unknown',
@@ -1930,18 +1934,31 @@ export function TherapistConsoleModal({
         >
           <Icon svg={ICONS.pulse} size={14} color={CS.secondary} />
           Activity Monitor
-          {mimoClientList.length > 0 ? (
-            <span
-              style={{
-                marginLeft: 'auto',
-                fontSize: '10px',
-                fontWeight: 600,
-                color: CS.onSurfaceMuted,
-              }}
-            >
-              {mimoClientList.length}
-            </span>
-          ) : null}
+          <span style={{ marginLeft: 'auto', display: 'flex', gap: '4px', alignItems: 'center' }}>
+            {(() => {
+              const criticalCount = mimoClientList.filter(c => getWorstMiMoAlertSeverity(c.alerts) === 'red').length;
+              const warningCount = mimoClientList.filter(c => getWorstMiMoAlertSeverity(c.alerts) === 'yellow').length;
+              return (
+                <>
+                  {criticalCount > 0 ? (
+                    <span style={{ background: CS.critical, color: '#fff', fontSize: '10px', fontWeight: 700, borderRadius: '10px', padding: '1px 6px', lineHeight: 1.6 }}>
+                      {criticalCount} CRIT
+                    </span>
+                  ) : null}
+                  {warningCount > 0 ? (
+                    <span style={{ background: CS.warning, color: '#fff', fontSize: '10px', fontWeight: 700, borderRadius: '10px', padding: '1px 6px', lineHeight: 1.6 }}>
+                      {warningCount} WARN
+                    </span>
+                  ) : null}
+                  {mimoClientList.length > 0 && criticalCount === 0 && warningCount === 0 ? (
+                    <span style={{ fontSize: '10px', fontWeight: 600, color: CS.onSurfaceMuted }}>
+                      {mimoClientList.length}
+                    </span>
+                  ) : null}
+                </>
+              );
+            })()}
+          </span>
         </div>
         {mimoClientList.length === 0 ? (
           <div
@@ -2076,6 +2093,23 @@ export function TherapistConsoleModal({
                         }}
                       >
                         {client.connectivityState}
+                      </span>
+                    ) : null}
+                    {/* Triage severity badge — only shown for critical/warning */}
+                    {sessionTone === 'critical' || sessionTone === 'warning' ? (
+                      <span
+                        style={{
+                          fontSize: '10px',
+                          fontWeight: 700,
+                          color: '#fff',
+                          background: sessionTone === 'critical' ? CS.critical : CS.warning,
+                          borderRadius: CS.radiusFull,
+                          padding: '2px 7px',
+                          flexShrink: 0,
+                          letterSpacing: '0.03em',
+                        }}
+                      >
+                        {sessionTone === 'critical' ? '⚑ ALERT' : '⚑ WARN'}
                       </span>
                     ) : null}
                   </div>
@@ -4482,14 +4516,7 @@ export function TherapistConsoleModal({
                         type="button"
                         disabled={breakoutBusy}
                         onClick={() => {
-                          if (breakoutBusy) {
-                            return;
-                          }
-                          if (
-                            !window.confirm(
-                              `Rejoin “${savedMultiPartyContext.title}”?${activeCall?.callMode === CallModeValue.Direct ? ' This will end the current 1:1 call if it is still active.' : ''}`
-                            )
-                          ) {
+                          if (breakoutBusy || !onRejoinSavedMultiParty) {
                             return;
                           }
                           onRejoinSavedMultiParty();
@@ -5875,6 +5902,76 @@ export function TherapistConsoleModal({
                                     ? `1:1 session with ${selectedInterventionTargetTitle}`
                                     : '1:1 session unavailable'}
                               </button>
+                            ) : null}
+                            {onSendTherapistPrompt &&
+                            selectedInterventionConversation?.serviceId ? (
+                              <div
+                                style={{
+                                  display: 'flex',
+                                  gap: '6px',
+                                  alignItems: 'stretch',
+                                }}
+                              >
+                                <input
+                                  type="text"
+                                  placeholder="Send prompt to client…"
+                                  value={therapistPromptText}
+                                  onChange={e =>
+                                    setTherapistPromptText(e.target.value)
+                                  }
+                                  onKeyDown={e => {
+                                    if (
+                                      e.key === 'Enter' &&
+                                      therapistPromptText.trim() &&
+                                      selectedInterventionConversation.serviceId
+                                    ) {
+                                      onSendTherapistPrompt(
+                                        selectedInterventionConversation.serviceId,
+                                        therapistPromptText.trim()
+                                      );
+                                      setTherapistPromptText('');
+                                    }
+                                  }}
+                                  style={{
+                                    flex: 1,
+                                    borderRadius: CS.radiusMd,
+                                    border: `1px solid ${CS.border}`,
+                                    padding: '8px 10px',
+                                    fontSize: '12px',
+                                    fontFamily: CS.fontBody,
+                                    background: CS.card,
+                                    color: CS.onSurface,
+                                    outline: 'none',
+                                  }}
+                                />
+                                <button
+                                  type="button"
+                                  disabled={!therapistPromptText.trim()}
+                                  onClick={() => {
+                                    if (
+                                      !therapistPromptText.trim() ||
+                                      !selectedInterventionConversation.serviceId
+                                    ) {
+                                      return;
+                                    }
+                                    onSendTherapistPrompt(
+                                      selectedInterventionConversation.serviceId,
+                                      therapistPromptText.trim()
+                                    );
+                                    setTherapistPromptText('');
+                                  }}
+                                  style={{
+                                    ...csPrimaryButton(
+                                      !therapistPromptText.trim()
+                                    ),
+                                    padding: '8px 12px',
+                                    fontSize: '12px',
+                                    whiteSpace: 'nowrap',
+                                  }}
+                                >
+                                  Send
+                                </button>
+                              </div>
                             ) : null}
                             {selectedLiveParticipant ? (
                               <>

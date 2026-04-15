@@ -27,6 +27,7 @@ import {
 } from '../selectors/conversations.dom.ts';
 import { useConversationsActions } from '../ducks/conversations.preload.ts';
 import { useTherapistBreakoutOptional } from './TherapistBreakoutProvider.preload.tsx';
+import { sendTherapistPrompt } from '../../services/mimoMessageSender.preload.ts';
 
 const getGroupCallVideoFrameSource =
   callingService.getGroupCallVideoFrameSource.bind(callingService);
@@ -238,6 +239,13 @@ export const SmartTherapistConsole = memo(function SmartTherapistConsole() {
     [updateCallLinkName]
   );
 
+  const handleSendTherapistPrompt = useCallback(
+    (recipientServiceId: ServiceIdString, text: string) => {
+      void sendTherapistPrompt(recipientServiceId, text);
+    },
+    []
+  );
+
   return (
     <TherapistConsoleModal
       activeCall={activeCall}
@@ -260,6 +268,7 @@ export const SmartTherapistConsole = memo(function SmartTherapistConsole() {
       onBreakoutToOneToOne={therapistBreakout?.handleBreakoutToOneToOne}
       onOpenCallControls={handleOpenCallControls}
       onRejoinSavedMultiParty={therapistBreakout?.handleRejoinSavedMultiParty}
+      onSendTherapistPrompt={handleSendTherapistPrompt}
       onRemoteMute={handleRemoteMute}
       onRemoveParticipant={handleRemoveParticipant}
       onStartAudioCall={handleStartAudioCall}

@@ -25,6 +25,22 @@ Please use our community forum: https://community.signalusers.org/
 Please see [CONTRIBUTING.md](https://github.com/signalapp/Signal-Desktop/blob/main/CONTRIBUTING.md)
 for setup instructions and guidelines for new contributors. Don't forget to sign the [CLA](https://signal.org/cla/).
 
+## Machine Switch Bootstrap
+
+When moving this working copy between machines (or between x64/arm64 environments), run:
+
+```bash
+pnpm run bootstrap:machine
+```
+
+This script validates the Node/pnpm toolchain, installs dependencies, rebuilds Electron native modules, and verifies `fs-xattr` architecture.
+
+After bootstrap succeeds, start the app with:
+
+```bash
+pnpm run start:prod
+```
+
 ## Contributing Funds
 
 You can donate to Signal development through the [Signal Technology Foundation](https://signal.org/donate), an independent 501c3 nonprofit.

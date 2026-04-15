@@ -522,9 +522,9 @@ Markers reflect work landed in **`Signal-Desktop-therapist`** and **`Signal-Desk
 - [x] add alert summary panel if possible *(Session Alerts panel + per-session cues)*
 
 #### Day 19
-- [ ] implement triage prioritization
-- [ ] flagged sessions move to top / become highlighted
-- [~] improve therapist response flow *(intervention + breakout; not alert-driven)*
+- [x] implement triage prioritization *(sort by severity; critical/warning count badges in monitor header)*
+- [x] flagged sessions move to top / become highlighted *(tile grid + monitor list sorted by severity; ALERT/WARN chips + pulsing borders on critical/warning tiles)*
+- [x] improve therapist response flow *(rejoin confirm removed; "Send prompt to client" text input added to intervention panel; auto-rejoin group after 1:1)*
 
 #### Day 20
 - [~] integrate full workflow:
