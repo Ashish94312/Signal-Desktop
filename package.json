@@ -18,6 +18,8 @@
     "postinstall": "pnpm run build:acknowledgments && pnpm run electron:install-app-deps",
     "postuninstall": "pnpm run build:acknowledgments",
     "start": "electron .",
+    "start:prod": "cross-env NODE_ENV=production electron .",
+    "bootstrap:machine": "bash ./scripts/machine-bootstrap.sh",
     "generate": "run-s generate:phase-0 generate:phase-1",
     "generate:phase-0": "run-s build:protobuf build:rolldown:prod",
     "generate:phase-1": "run-p --aggregate-output --print-label build:icu-types build:compact-locales build:styles:prod get-expire-time build:webaudio-recorder build:policy-files",
@@ -378,7 +380,6 @@
     },
     "patchedDependencies": {
       "casual@1.6.2": "patches/casual+1.6.2.patch",
-      "@types/express@4.17.21": "patches/@types+express+4.17.21.patch",
       "@types/fabric@4.5.3": "patches/@types+fabric+4.5.3.patch",
       "qrcode-generator@1.4.4": "patches/qrcode-generator+1.4.4.patch",
       "@types/node-fetch@2.6.12": "patches/@types__node-fetch@2.6.12.patch",

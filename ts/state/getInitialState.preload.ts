@@ -28,6 +28,7 @@ import { getEmptyState as lightboxEmptyState } from './ducks/lightbox.preload.ts
 import { getEmptyState as linkPreviewsEmptyState } from './ducks/linkPreviews.preload.ts';
 import { getEmptyState as mediaGalleryEmptyState } from './ducks/mediaGallery.preload.ts';
 import { getEmptyState as megaphonesEmptyState } from './ducks/megaphones.preload.ts';
+import { getEmptyState as mimoSessionEmptyState } from './ducks/mimoSession.preload.ts';
 import { getEmptyState as navEmptyState } from './ducks/nav.std.ts';
 import { getEmptyState as networkEmptyState } from './ducks/network.dom.ts';
 import { getEmptyState as notificationProfilesEmptyState } from './ducks/notificationProfiles.preload.ts';
@@ -172,6 +173,7 @@ function getEmptyState(): StateType {
     linkPreviews: linkPreviewsEmptyState(),
     mediaGallery: mediaGalleryEmptyState(),
     megaphones: megaphonesEmptyState(),
+    mimoSession: mimoSessionEmptyState(),
     nav: navEmptyState(),
     network: networkEmptyState(),
     notificationProfiles: notificationProfilesEmptyState(),

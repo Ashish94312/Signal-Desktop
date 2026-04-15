@@ -83,6 +83,10 @@ import {
   initializeAllJobQueues,
   shutdownAllJobQueues,
 } from './jobs/initializeAllJobQueues.preload.ts';
+import {
+  forwardIncomingMiMoMessage,
+  isMiMoMessageBody,
+} from './services/mimoMessageHandler.preload.ts';
 import { removeStorageKeyJobQueue } from './jobs/removeStorageKeyJobQueue.preload.ts';
 import { conversationJobQueue } from './jobs/conversationJobQueue.preload.ts';
 import { ourProfileKeyService } from './services/ourProfileKey.std.ts';
@@ -2457,6 +2461,11 @@ export async function startApp(): Promise<void> {
         confirm,
         messageDescriptor,
       });
+    }
+
+    if (isMiMoMessageBody(data.message.body)) {
+      forwardIncomingMiMoMessage(data, confirm);
+      return;
     }
 
     const message = initIncomingMessage(data, messageDescriptor);

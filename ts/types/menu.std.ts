@@ -16,6 +16,7 @@ export type MenuOptionsType = Readonly<{
 
 export type MenuActionsType = Readonly<{
   forceUpdate: () => unknown;
+  openMimoMetadataMonitor: () => unknown;
   openArtCreator: () => unknown;
   openContactUs: () => unknown;
   openForums: () => unknown;
@@ -24,7 +25,9 @@ export type MenuActionsType = Readonly<{
   openSupportPage: () => unknown;
   setupAsNewDevice: () => unknown;
   setupAsStandalone: () => unknown;
+  simulateMimoClientMetadata: () => unknown;
   showAbout: () => unknown;
+  showTherapistConsole: () => unknown;
   showDebugLog: () => unknown;
   showKeyboardShortcuts: () => unknown;
   showSettings: () => unknown;

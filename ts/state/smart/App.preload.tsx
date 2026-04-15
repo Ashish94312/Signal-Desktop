@@ -1,6 +1,6 @@
 // Copyright 2021 Signal Messenger, LLC
 // SPDX-License-Identifier: AGPL-3.0-only
-import React, { memo } from 'react';
+import React, { memo, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import { requestVerification as doRequestVerification } from '../../textsecure/WebAPI.preload.ts';
 import { accountManager } from '../../textsecure/AccountManager.preload.ts';
@@ -20,27 +20,78 @@ import {
   getIsMainWindowMaximized,
   getIsMainWindowFullScreen,
   getTheme,
+  getUserACI,
 } from '../selectors/user.std.ts';
+import { drop } from '../../util/drop.std.ts';
 import { hasSelectedStoryData as getHasSelectedStoryData } from '../selectors/stories.preload.ts';
 import { useAppActions } from '../ducks/app.preload.ts';
 import { useConversationsActions } from '../ducks/conversations.preload.ts';
 import { useStoriesActions } from '../ducks/stories.preload.ts';
+import { useGlobalModalActions } from '../ducks/globalModals.preload.ts';
 import { ErrorBoundary } from '../../components/ErrorBoundary.dom.tsx';
 import { ModalContainer } from '../../components/ModalContainer.dom.tsx';
 import { SmartInbox } from './Inbox.preload.tsx';
 import { getApp } from '../selectors/app.std.ts';
 import { SmartFunProvider } from './FunProvider.preload.tsx';
+import { MiMoTherapistMetadataProvider } from './MiMoTherapistMetadataProvider.preload.tsx';
+import { TherapistBreakoutProvider } from './TherapistBreakoutProvider.preload.tsx';
 
 function renderInbox(): React.JSX.Element {
   return <SmartInbox />;
 }
 
+/**
+ * Always renders SmartCallManager (which handles the console/call-UI switch
+ * internally via isTherapistConsoleVisible).  Also renders a fixed "Console"
+ * button so the client can navigate back to the Session Console both during
+ * a call and when no call is active — mirroring the therapist App.preload.tsx
+ * pattern.
+ */
+const SmartConditionalCallManager = memo(
+  function SmartConditionalCallManager() {
+    const isTherapistConsoleVisible = useSelector(
+      (state: { globalModals: { isTherapistConsoleVisible: boolean } }) =>
+        state.globalModals.isTherapistConsoleVisible
+    );
+    const { showTherapistConsole } = useGlobalModalActions();
+
+    return (
+      <>
+        {!isTherapistConsoleVisible && (
+          <button
+            aria-label="Open session console"
+            type="button"
+            onClick={showTherapistConsole}
+            style={{
+              position: 'fixed',
+              bottom: '16px',
+              left: '16px',
+              zIndex: 10000,
+              padding: '7px 14px',
+              backgroundColor: '#2c6bed',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: '13px',
+              fontWeight: 600,
+              boxShadow: '0 2px 8px rgba(0,0,0,0.35)',
+              userSelect: 'none',
+            }}
+          >
+            Console
+          </button>
+        )}
+        <ModalContainer className="module-calling__modal-container">
+          <SmartCallManager />
+        </ModalContainer>
+      </>
+    );
+  }
+);
+
 function renderCallManager(): React.JSX.Element {
-  return (
-    <ModalContainer className="module-calling__modal-container">
-      <SmartCallManager />
-    </ModalContainer>
-  );
+  return <SmartConditionalCallManager />;
 }
 
 function renderGlobalModalContainer(): React.JSX.Element {
@@ -110,6 +161,15 @@ export const SmartApp = memo(function SmartApp() {
   const isFullScreen = useSelector(getIsMainWindowFullScreen);
   const hasSelectedStoryData = useSelector(getHasSelectedStoryData);
   const theme = useSelector(getTheme);
+  const ourAci = useSelector(getUserACI);
+
+  useEffect(() => {
+    if (ourAci) {
+      drop(window.IPC.setMiMoLocalClientSessionId(ourAci));
+    } else {
+      drop(window.IPC.setMiMoLocalClientSessionId(null));
+    }
+  }, [ourAci]);
 
   const { openInbox } = useAppActions();
   const { scrollToMessage } = useConversationsActions();
@@ -118,28 +178,32 @@ export const SmartApp = memo(function SmartApp() {
   const osClassName = OS.getClassName();
 
   return (
-    <SmartFunProvider>
-      <App
-        state={state}
-        isMaximized={isMaximized}
-        isFullScreen={isFullScreen}
-        getCaptchaToken={getCaptchaToken}
-        osClassName={osClassName}
-        renderCallManager={renderCallManager}
-        renderGlobalModalContainer={renderGlobalModalContainer}
-        renderLightbox={renderLightbox}
-        hasSelectedStoryData={hasSelectedStoryData}
-        readyForUpdates={readyForUpdates}
-        renderStoryViewer={renderStoryViewer}
-        renderInbox={renderInbox}
-        requestVerification={requestVerification}
-        registerSingleDevice={registerSingleDevice}
-        uploadProfile={uploadProfile}
-        theme={theme}
-        openInbox={openInbox}
-        scrollToMessage={scrollToMessage}
-        viewStory={viewStory}
-      />
-    </SmartFunProvider>
+    <TherapistBreakoutProvider>
+      <MiMoTherapistMetadataProvider>
+        <SmartFunProvider>
+          <App
+            state={state}
+            isMaximized={isMaximized}
+            isFullScreen={isFullScreen}
+            getCaptchaToken={getCaptchaToken}
+            osClassName={osClassName}
+            renderCallManager={renderCallManager}
+            renderGlobalModalContainer={renderGlobalModalContainer}
+            renderLightbox={renderLightbox}
+            hasSelectedStoryData={hasSelectedStoryData}
+            readyForUpdates={readyForUpdates}
+            renderStoryViewer={renderStoryViewer}
+            renderInbox={renderInbox}
+            requestVerification={requestVerification}
+            registerSingleDevice={registerSingleDevice}
+            uploadProfile={uploadProfile}
+            theme={theme}
+            openInbox={openInbox}
+            scrollToMessage={scrollToMessage}
+            viewStory={viewStory}
+          />
+        </SmartFunProvider>
+      </MiMoTherapistMetadataProvider>
+    </TherapistBreakoutProvider>
   );
 });

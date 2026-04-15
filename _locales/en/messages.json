@@ -1043,6 +1043,18 @@
     "messageformat": "Debug Log",
     "description": "View menu item to open the debug log (title case)"
   },
+  "icu:mimoMenuSessionConsole": {
+    "messageformat": "Session Console",
+    "description": "View menu item to open the integrated Session Console (calls, sessions, messages)"
+  },
+  "icu:mimoMenuOpenMetadataMonitor": {
+    "messageformat": "MiMo Metadata Monitor",
+    "description": "View menu item to open the local MiMo metadata monitor window"
+  },
+  "icu:mimoMenuSimulateClientMetadata": {
+    "messageformat": "Simulate MiMo Client Metadata",
+    "description": "View menu item to inject demo MiMo metadata for development"
+  },
   "icu:forceUpdate": {
     "messageformat": "Force Update",
     "description": "View menu item to force the app to update download and install"

@@ -773,6 +773,15 @@
   "icu:debugLog": {
     "messageformat": "ਡੀਬੱਗ ਲੌਗ"
   },
+  "icu:mimoMenuSessionConsole": {
+    "messageformat": "Session Console"
+  },
+  "icu:mimoMenuOpenMetadataMonitor": {
+    "messageformat": "MiMo Metadata Monitor"
+  },
+  "icu:mimoMenuSimulateClientMetadata": {
+    "messageformat": "Simulate MiMo Client Metadata"
+  },
   "icu:forceUpdate": {
     "messageformat": "ਜ਼ਬਰੀ ਅੱਪਡੇਟ ਕਰੋ"
   },

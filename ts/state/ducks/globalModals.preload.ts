@@ -154,6 +154,7 @@ export type GlobalModalsStateType = ReadonlyDeep<{
   profileNameWarningModalConversationType?: string;
   isShortcutGuideModalVisible: boolean;
   isSignalConnectionsVisible: boolean;
+  isTherapistConsoleVisible: boolean;
   isStoriesSettingsVisible: boolean;
   isWhatsNewVisible: boolean;
   isKeyTransparencyErrorVisible: boolean;
@@ -246,6 +247,8 @@ const TOGGLE_MESSAGE_REQUEST_ACTIONS_CONFIRMATION =
   'globalModals/TOGGLE_MESSAGE_REQUEST_ACTIONS_CONFIRMATION';
 const CLOSE_SHORTCUT_GUIDE_MODAL = 'globalModals/CLOSE_SHORTCUT_GUIDE_MODAL';
 const SHOW_SHORTCUT_GUIDE_MODAL = 'globalModals/SHOW_SHORTCUT_GUIDE_MODAL';
+const SHOW_THERAPIST_CONSOLE = 'globalModals/SHOW_THERAPIST_CONSOLE';
+const HIDE_THERAPIST_CONSOLE = 'globalModals/HIDE_THERAPIST_CONSOLE';
 const TOGGLE_CONFIRMATION_MODAL = 'globalModals/TOGGLE_CONFIRMATION_MODAL';
 const SHOW_EDIT_HISTORY_MODAL = 'globalModals/SHOW_EDIT_HISTORY_MODAL';
 const CLOSE_EDIT_HISTORY_MODAL = 'globalModals/CLOSE_EDIT_HISTORY_MODAL';
@@ -546,6 +549,14 @@ type ShowShortcutGuideModalActionType = ReadonlyDeep<{
   type: typeof SHOW_SHORTCUT_GUIDE_MODAL;
 }>;
 
+type ShowTherapistConsoleActionType = ReadonlyDeep<{
+  type: typeof SHOW_THERAPIST_CONSOLE;
+}>;
+
+type HideTherapistConsoleActionType = ReadonlyDeep<{
+  type: typeof HIDE_THERAPIST_CONSOLE;
+}>;
+
 type ShowEditHistoryModalActionType = ReadonlyDeep<{
   type: typeof SHOW_EDIT_HISTORY_MODAL;
   payload: {
@@ -609,6 +620,8 @@ export type GlobalModalsActionType = ReadonlyDeep<
   | ShowMediaPermissionsModalActionType
   | ShowSendAnywayDialogActionType
   | ShowShortcutGuideModalActionType
+  | ShowTherapistConsoleActionType
+  | HideTherapistConsoleActionType
   | ShowStickerPackPreviewActionType
   | ShowStoriesSettingsActionType
   | ShowTapToViewNotAvailableModalActionType
@@ -658,6 +671,7 @@ export const actions = {
   hideKeyTransparencyErrorDialog,
   hideKeyTransparencyOnboardingDialog,
   hideLowDiskSpaceBackupImportModal,
+  hideTherapistConsole,
   hideStoriesSettings,
   hideTapToViewNotAvailableModal,
   hideTerminateGroupFailedModal,
@@ -677,6 +691,7 @@ export const actions = {
   showLowDiskSpaceBackupImportModal,
   showShareCallLinkViaSignal,
   showShortcutGuideModal,
+  showTherapistConsole,
   showStickerPackPreview,
   showStoriesSettings,
   showTapToViewNotAvailableModal,
@@ -1463,6 +1478,18 @@ function showShortcutGuideModal(): ShowShortcutGuideModalActionType {
   };
 }
 
+function showTherapistConsole(): ShowTherapistConsoleActionType {
+  return {
+    type: SHOW_THERAPIST_CONSOLE,
+  };
+}
+
+function hideTherapistConsole(): HideTherapistConsoleActionType {
+  return {
+    type: HIDE_THERAPIST_CONSOLE,
+  };
+}
+
 function copyOverMessageAttributesIntoEditHistory(
   messageAttributes: ReadonlyDeep<ReadonlyMessageAttributesType>
 ): EditHistoryMessagesType | undefined {
@@ -1576,6 +1603,7 @@ export function getEmptyState(): GlobalModalsStateType {
     profileNameWarningModalConversationType: undefined,
     isShortcutGuideModalVisible: false,
     isSignalConnectionsVisible: false,
+    isTherapistConsoleVisible: false,
     isStoriesSettingsVisible: false,
     isWhatsNewVisible: false,
     isKeyTransparencyErrorVisible: false,
@@ -1942,6 +1970,20 @@ export function reducer(
     return {
       ...state,
       isShortcutGuideModalVisible: true,
+    };
+  }
+
+  if (action.type === SHOW_THERAPIST_CONSOLE) {
+    return {
+      ...state,
+      isTherapistConsoleVisible: true,
+    };
+  }
+
+  if (action.type === HIDE_THERAPIST_CONSOLE) {
+    return {
+      ...state,
+      isTherapistConsoleVisible: false,
     };
   }
 

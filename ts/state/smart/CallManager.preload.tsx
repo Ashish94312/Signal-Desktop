@@ -1,7 +1,6 @@
 // Copyright 2020 Signal Messenger, LLC
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import lodash from 'lodash';
 import React, { memo, useEffect, useState } from 'react';
 import { useSelector } from 'react-redux';
 import type {
@@ -18,33 +17,28 @@ import {
   bounceAppIconStop,
 } from '../../shims/bounceAppIcon.preload.ts';
 import type { CallLinkType } from '../../types/CallLink.std.ts';
-import type {
-  ActiveCallBaseType,
-  ActiveCallType,
-  ActiveDirectCallType,
-  ActiveGroupCallType,
-  CallingConversationType,
-  ConversationsByDemuxIdType,
-  GroupCallRemoteParticipantType,
-} from '../../types/Calling.std.ts';
-import { CallState } from '../../types/Calling.std.ts';
 import { CallMode } from '../../types/CallDisposition.std.ts';
-import type { AciString } from '../../types/ServiceId.std.ts';
-import { callLinkToConversation } from '../../util/callLinks.std.ts';
 import { callingTones } from '../../util/callingTones.preload.ts';
 import { missingCaseError } from '../../util/missingCaseError.std.ts';
 import { useAudioPlayerActions } from '../ducks/audioPlayer.preload.ts';
+import { useConversationsActions } from '../ducks/conversations.preload.ts';
 import { getActiveCall, useCallingActions } from '../ducks/calling.preload.ts';
-import type { ConversationType } from '../ducks/conversations.preload.ts';
+import { useNavActions } from '../ducks/nav.std.ts';
 import type { StateType } from '../reducer.preload.ts';
 import { getHasInitialLoadCompleted } from '../selectors/app.std.ts';
 import {
-  getActiveCallState,
+  getAllCallLinks,
+  getAvailableMicrophones,
   getAvailableCameras,
+  getAvailableSpeakers,
   getCallLinkSelector,
   getRingingCall,
+  getSelectedCamera,
+  getSelectedMicrophone,
+  getSelectedSpeaker,
 } from '../selectors/calling.std.ts';
 import {
+  getAllConversations,
   getConversationSelector,
   getMe,
 } from '../selectors/conversations.dom.ts';
@@ -56,8 +50,14 @@ import { useGlobalModalActions } from '../ducks/globalModals.preload.ts';
 import { isLonelyGroup } from '../ducks/callingHelpers.std.ts';
 import { getActiveProfile } from '../selectors/notificationProfiles.dom.ts';
 import { isOnline as isWebAPIOnline } from '../../textsecure/WebAPI.preload.ts';
+import {
+  getIsTherapistConsoleVisible,
+} from '../selectors/globalModals.std.ts';
+import { useTherapistBreakoutOptional } from './TherapistBreakoutProvider.preload.tsx';
+import { mapStateToActiveCallProp } from './mapStateToActiveCallProp.preload.tsx';
+import { NavTab } from '../../types/Nav.std.ts';
 
-const { memoize } = lodash;
+export { mapStateToActiveCallProp };
 
 const log = createLogger('CallManager');
 
@@ -76,224 +76,6 @@ function setLocalPreviewContainer(options: SetLocalPreviewContainerType): void {
 
 const playRingtone = callingTones.playRingtone.bind(callingTones);
 const stopRingtone = callingTones.stopRingtone.bind(callingTones);
-
-const mapStateToActiveCallProp = (
-  state: StateType
-): undefined | ActiveCallType => {
-  const { calling } = state;
-  const activeCallState = getActiveCallState(state);
-
-  if (!activeCallState) {
-    return undefined;
-  }
-
-  const call = getActiveCall(calling);
-  if (!call) {
-    log.error('There was an active call state but no corresponding call');
-    return undefined;
-  }
-
-  const conversationSelector = getConversationSelector(state);
-  let conversation: CallingConversationType;
-  if (call.callMode === CallMode.Adhoc) {
-    const callLinkSelector = getCallLinkSelector(state);
-    const callLink = callLinkSelector(activeCallState.conversationId);
-    if (!callLink) {
-      // An error is logged in mapStateToCallLinkProp
-      return undefined;
-    }
-
-    conversation = callLinkToConversation(callLink, window.SignalContext.i18n);
-  } else {
-    conversation = conversationSelector(activeCallState.conversationId);
-  }
-  if (!conversation) {
-    log.error('The active call has no corresponding conversation');
-    return undefined;
-  }
-
-  const conversationSelectorByAci = memoize<
-    (aci: AciString) => undefined | ConversationType
-  >(aci => {
-    const convoForAci = window.ConversationController.lookupOrCreate({
-      serviceId: aci,
-      reason: 'CallManager.mapStateToActiveCallProp',
-    });
-    return convoForAci ? conversationSelector(convoForAci.id) : undefined;
-  });
-
-  const baseResult: ActiveCallBaseType = {
-    conversation,
-    hasLocalAudio: activeCallState.hasLocalAudio,
-    hasLocalVideo: activeCallState.hasLocalVideo,
-    localAudioLevel: activeCallState.localAudioLevel,
-    viewMode: activeCallState.viewMode,
-    viewModeBeforePresentation: activeCallState.viewModeBeforePresentation,
-    joinedAt: activeCallState.joinedAt,
-    outgoingRing: activeCallState.outgoingRing,
-    pip: activeCallState.pip,
-    presentingSource: activeCallState.presentingSource,
-    presentingSourcesAvailable: activeCallState.presentingSourcesAvailable,
-    settingsDialogOpen: activeCallState.settingsDialogOpen,
-    selfViewExpanded: activeCallState.selfViewExpanded,
-    showNeedsScreenRecordingPermissionsWarning: Boolean(
-      activeCallState.showNeedsScreenRecordingPermissionsWarning
-    ),
-    showParticipantsList: activeCallState.showParticipantsList,
-    reactions: activeCallState.reactions,
-  };
-
-  switch (call.callMode) {
-    case CallMode.Direct:
-      if (
-        call.isIncoming &&
-        (call.callState === CallState.Prering ||
-          call.callState === CallState.Ringing)
-      ) {
-        return;
-      }
-
-      return {
-        ...baseResult,
-        callEndedReason: call.callEndedReason,
-        callMode: CallMode.Direct,
-        callState: call.callState,
-        peekedParticipants: [],
-        remoteAudioLevel: call.remoteAudioLevel,
-        hasRemoteAudio: Boolean(call.hasRemoteAudio),
-        hasRemoteVideo: Boolean(call.hasRemoteVideo),
-        remoteParticipants: [
-          {
-            hasRemoteVideo: Boolean(call.hasRemoteVideo),
-            presenting: Boolean(call.isSharingScreen),
-            title: conversation.title,
-            serviceId: conversation.serviceId,
-          },
-        ],
-      } satisfies ActiveDirectCallType;
-    case CallMode.Group:
-    case CallMode.Adhoc: {
-      const groupMembers: Array<ConversationType> = [];
-      const remoteParticipants: Array<GroupCallRemoteParticipantType> = [];
-      const peekedParticipants: Array<ConversationType> = [];
-      const pendingParticipants: Array<ConversationType> = [];
-      const conversationsByDemuxId: ConversationsByDemuxIdType = new Map();
-      const { localDemuxId } = call;
-      const raisedHands: Set<number> = new Set(call.raisedHands ?? []);
-
-      const { memberships = [] } = conversation;
-
-      // Active calls should have peek info, but TypeScript doesn't know that so we have a
-      //   fallback.
-      const {
-        peekInfo = {
-          deviceCount: 0,
-          maxDevices: Infinity,
-          acis: [],
-          pendingAcis: [],
-        },
-      } = call;
-
-      for (const membership of memberships) {
-        const { aci } = membership;
-
-        const member = conversationSelector(aci);
-        if (!member) {
-          log.error('Group member has no corresponding conversation');
-          continue;
-        }
-
-        groupMembers.push(member);
-      }
-
-      for (const remoteParticipant of call.remoteParticipants) {
-        const remoteConversation = conversationSelectorByAci(
-          remoteParticipant.aci
-        );
-        if (!remoteConversation) {
-          log.error('Remote participant has no corresponding conversation');
-          continue;
-        }
-
-        remoteParticipants.push({
-          ...remoteConversation,
-          aci: remoteParticipant.aci,
-          addedTime: remoteParticipant.addedTime,
-          demuxId: remoteParticipant.demuxId,
-          hasRemoteAudio: remoteParticipant.hasRemoteAudio,
-          hasRemoteVideo: remoteParticipant.hasRemoteVideo,
-          isHandRaised: raisedHands.has(remoteParticipant.demuxId),
-          mediaKeysReceived: remoteParticipant.mediaKeysReceived,
-          presenting: remoteParticipant.presenting,
-          sharingScreen: remoteParticipant.sharingScreen,
-          speakerTime: remoteParticipant.speakerTime,
-          videoAspectRatio: remoteParticipant.videoAspectRatio,
-        });
-        conversationsByDemuxId.set(
-          remoteParticipant.demuxId,
-          remoteConversation
-        );
-      }
-
-      if (localDemuxId !== undefined) {
-        conversationsByDemuxId.set(localDemuxId, getMe(state));
-      }
-
-      // Filter raisedHands to ensure valid demuxIds.
-      raisedHands.forEach(demuxId => {
-        if (!conversationsByDemuxId.has(demuxId)) {
-          raisedHands.delete(demuxId);
-        }
-      });
-
-      for (const peekedParticipantAci of peekInfo.acis) {
-        const peekedConversation =
-          conversationSelectorByAci(peekedParticipantAci);
-        if (!peekedConversation) {
-          log.error('Remote participant has no corresponding conversation');
-          continue;
-        }
-
-        peekedParticipants.push(peekedConversation);
-      }
-
-      for (const aci of peekInfo.pendingAcis) {
-        // In call links, pending users may be unknown until they share profile keys.
-        // conversationSelectorByAci should create conversations for new contacts.
-        const pendingConversation = conversationSelectorByAci(aci);
-        if (!pendingConversation) {
-          log.error('Pending participant has no corresponding conversation');
-          continue;
-        }
-
-        pendingParticipants.push(pendingConversation);
-      }
-
-      return {
-        ...baseResult,
-        callMode: call.callMode,
-        connectionState: call.connectionState,
-        conversationsByDemuxId,
-        deviceCount: peekInfo.deviceCount,
-        groupMembers,
-        isConversationTooBigToRing: getIsConversationTooBigToRing(conversation),
-        joinState: call.joinState,
-        localDemuxId,
-        maxDevices: peekInfo.maxDevices,
-        peekedParticipants,
-        pendingParticipants,
-        raisedHands,
-        remoteParticipants,
-        remoteAudioLevels: call.remoteAudioLevels || new Map<number, number>(),
-        suggestLowerHand: Boolean(activeCallState.suggestLowerHand),
-        mutedBy: activeCallState.mutedBy,
-        observedRemoteMute: activeCallState.observedRemoteMute,
-      } satisfies ActiveGroupCallType;
-    }
-    default:
-      throw missingCaseError(call);
-  }
-};
 
 const mapStateToCallLinkProp = (state: StateType): CallLinkType | undefined => {
   const { calling } = state;
@@ -384,10 +166,19 @@ export const SmartCallManager = memo(function SmartCallManager() {
   const activeCall = useSelector(mapStateToActiveCallProp);
   const callLink = useSelector(mapStateToCallLinkProp);
   const ringingCall = useSelector(mapStateToRingingCallProp);
+  const availableCallLinks = useSelector(getAllCallLinks);
   const availableCameras = useSelector(getAvailableCameras);
+  const availableConversations = useSelector(getAllConversations);
+  const availableMicrophones = useSelector(getAvailableMicrophones);
+  const availableSpeakers = useSelector(getAvailableSpeakers);
   const hasInitialLoadCompleted = useSelector(getHasInitialLoadCompleted);
   const me = useSelector(getMe);
   const activeNotificationProfile = useSelector(getActiveProfile);
+  const isTherapistConsoleVisible = useSelector(getIsTherapistConsoleVisible);
+  const therapistBreakout = useTherapistBreakoutOptional();
+  const selectedCamera = useSelector(getSelectedCamera);
+  const selectedMicrophone = useSelector(getSelectedMicrophone);
+  const selectedSpeaker = useSelector(getSelectedSpeaker);
 
   const [isOnline, setIsOnline] = useState(isWebAPIOnline() ?? false);
 
@@ -407,11 +198,14 @@ export const SmartCallManager = memo(function SmartCallManager() {
     };
   }, []);
 
+  const { changeLocation } = useNavActions();
   const {
     approveUser,
     batchUserAction,
+    createCallLink,
     denyUser,
     changeCallView,
+    changeIODevice,
     closeNeedPermissionScreen,
     getPresentingSources,
     cancelCall,
@@ -420,6 +214,8 @@ export const SmartCallManager = memo(function SmartCallManager() {
     acceptCall,
     declineCall,
     openSystemPreferencesAction,
+    onOutgoingAudioCallInConversation,
+    onOutgoingVideoCallInConversation,
     cancelPresenting,
     sendGroupCallRaiseHand,
     sendGroupCallReaction,
@@ -430,7 +226,11 @@ export const SmartCallManager = memo(function SmartCallManager() {
     setLocalAudioRemoteMuted,
     setLocalVideo,
     setOutgoingRing,
+    returnToActiveCall,
+    removeClient,
+    sendRemoteMute,
     setRendererCanvas,
+    startCallLinkLobbyByRoomId,
     switchToPresentationView,
     switchFromPresentationView,
     hangUpActiveCall,
@@ -438,21 +238,67 @@ export const SmartCallManager = memo(function SmartCallManager() {
     toggleScreenRecordingPermissionsDialog,
     toggleSelfViewExpanded,
     toggleSettings,
+    updateCallLinkName,
   } = useCallingActions();
   const { pauseVoiceNotePlayer } = useAudioPlayerActions();
+  const { addMembersToGroup, showConversation } = useConversationsActions();
   const {
     showContactModal,
+    hideTherapistConsole,
     showShareCallLinkViaSignal,
+    toggleCallLinkEditModal,
     toggleCallLinkPendingParticipantModal,
   } = useGlobalModalActions();
+
+  const handleCreateCallLink = React.useCallback(() => {
+    createCallLink(roomId => {
+      toggleCallLinkEditModal(roomId);
+      changeLocation({ tab: NavTab.Calls });
+      hideTherapistConsole();
+    });
+  }, [
+    changeLocation,
+    createCallLink,
+    hideTherapistConsole,
+    toggleCallLinkEditModal,
+  ]);
+
+  const handleStartAudioCall = React.useCallback(
+    (conversationId: string) => {
+      onOutgoingAudioCallInConversation(conversationId);
+      // Keep Session Console visible — same as SmartTherapistConsole (see TherapistConsole.preload).
+    },
+    [onOutgoingAudioCallInConversation]
+  );
+
+  const handleStartVideoCall = React.useCallback(
+    (conversationId: string) => {
+      onOutgoingVideoCallInConversation(conversationId);
+      // Keep Session Console visible for direct and group calls.
+    },
+    [onOutgoingVideoCallInConversation]
+  );
+
+  const handleJoinCallLink = React.useCallback(
+    (roomId: string) => {
+      startCallLinkLobbyByRoomId({ roomId });
+      // Keep Session Console visible while joining a call link.
+    },
+    [startCallLinkLobbyByRoomId]
+  );
 
   return (
     <CallManager
       acceptCall={acceptCall}
       activeCall={activeCall}
       activeNotificationProfile={activeNotificationProfile}
+      addMembersToGroup={addMembersToGroup}
       approveUser={approveUser}
       availableCameras={availableCameras}
+      availableCallLinks={availableCallLinks}
+      availableConversations={availableConversations}
+      availableMicrophones={availableMicrophones}
+      availableSpeakers={availableSpeakers}
       batchUserAction={batchUserAction}
       bounceAppIconStart={bounceAppIconStart}
       bounceAppIconStop={bounceAppIconStop}
@@ -460,6 +306,7 @@ export const SmartCallManager = memo(function SmartCallManager() {
       cancelCall={cancelCall}
       cancelPresenting={cancelPresenting}
       changeCallView={changeCallView}
+      changeIODevice={changeIODevice}
       closeNeedPermissionScreen={closeNeedPermissionScreen}
       declineCall={declineCall}
       denyUser={denyUser}
@@ -471,15 +318,35 @@ export const SmartCallManager = memo(function SmartCallManager() {
       hangUpActiveCall={hangUpActiveCall}
       hasInitialLoadCompleted={hasInitialLoadCompleted}
       i18n={i18n}
+      isTherapistConsoleVisible={isTherapistConsoleVisible}
+      therapistBreakoutSavedMultiPartyContext={
+        therapistBreakout?.savedMultiPartyContext ?? null
+      }
+      therapistBreakoutBusy={therapistBreakout?.breakoutBusy ?? false}
+      onTherapistBreakoutToOneToOne={therapistBreakout?.handleBreakoutToOneToOne}
+      onTherapistRejoinSavedMultiParty={
+        therapistBreakout?.handleRejoinSavedMultiParty
+      }
       isOnline={isOnline}
       me={me}
       notifyForCall={notifyForCall}
+      onCreateCallLink={handleCreateCallLink}
+      onJoinCallLink={handleJoinCallLink}
+      onStartAudioCall={handleStartAudioCall}
+      onStartVideoCall={handleStartVideoCall}
       openSystemPreferencesAction={openSystemPreferencesAction}
       pauseVoiceNotePlayer={pauseVoiceNotePlayer}
       playRingtone={playRingtone}
       renderDeviceSelection={renderDeviceSelection}
       renderReactionPicker={renderReactionPicker}
+      removeClientFromCall={removeClient}
       ringingCall={ringingCall}
+      returnToActiveCall={returnToActiveCall}
+      sendRemoteMute={sendRemoteMute}
+      showConversation={showConversation}
+      selectedCamera={selectedCamera}
+      selectedMicrophone={selectedMicrophone}
+      selectedSpeaker={selectedSpeaker}
       sendGroupCallRaiseHand={sendGroupCallRaiseHand}
       sendGroupCallReaction={sendGroupCallReaction}
       selectPresentingSource={selectPresentingSource}
@@ -507,6 +374,7 @@ export const SmartCallManager = memo(function SmartCallManager() {
       }
       toggleSelfViewExpanded={toggleSelfViewExpanded}
       toggleSettings={toggleSettings}
+      updateCallLinkName={updateCallLinkName}
     />
   );
 });

@@ -43,6 +43,7 @@ export type IPCType = {
   openSystemMediaPermissions: (
     mediaType: 'microphone' | 'camera' | 'screenCapture'
   ) => Promise<void>;
+  openExternalUrl: (url: string) => Promise<void>;
   getMediaPermissions: () => Promise<boolean | undefined>;
   whenWindowVisible: () => Promise<void>;
   logAppLoadedEvent?: (options: { processedCount?: number }) => void;
@@ -66,6 +67,11 @@ export type IPCType = {
   showSettings: () => void;
   showWindow: () => void;
   showWindowsNotification: (data: WindowsNotificationData) => Promise<void>;
+  setMiMoLocalClientSessionId: (
+    clientSessionId: string | null
+  ) => Promise<void>;
+  /** Main-process `MIMO_THERAPIST_SERVICE_ID` for group/call-link MiMo heartbeats. */
+  getMimoTherapistServiceId: () => Promise<string | null>;
   shutdown: () => void;
   startTrackingQueryStats: () => void;
   stopTrackingQueryStats: (options?: QueryStatsOptions) => void;

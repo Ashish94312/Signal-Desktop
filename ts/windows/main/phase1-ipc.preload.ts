@@ -29,10 +29,12 @@ import {
 import { AggregatedStats } from '../../textsecure/WebsocketResources.preload.ts';
 import { UNAUTHENTICATED_CHANNEL_NAME } from '../../textsecure/SocketManager.preload.ts';
 import { isProduction } from '../../util/version.std.ts';
+import type { MiMoMetadataIngestPayloadType } from '../../types/MiMoMetadata.std.ts';
 import { ToastType } from '../../types/Toast.dom.tsx';
 import { ConversationController } from '../../ConversationController.preload.ts';
 import { isEnabled } from '../../RemoteConfig.dom.ts';
 import { itemStorage } from '../../textsecure/Storage.preload.ts';
+import { initMimoBridgeRenderer } from '../../services/mimoBridgeRenderer.preload.ts';
 
 const { mapValues } = lodash;
 
@@ -107,6 +109,7 @@ const IPC: IPCType = {
     ipc.invoke('get-media-access-status', mediaType),
   openSystemMediaPermissions: mediaType =>
     ipc.invoke('open-system-media-permissions', mediaType),
+  openExternalUrl: (url: string) => ipc.invoke('open-external-url', url),
   getMediaPermissions: () => ipc.invoke('settings:get:mediaPermissions'),
   getMediaCameraPermissions: () =>
     ipc.invoke('settings:get:mediaCameraPermissions'),
@@ -164,6 +167,10 @@ const IPC: IPCType = {
   showWindowsNotification: async (data: WindowsNotificationData) => {
     return ipc.invoke('windows-notifications:show', data);
   },
+  setMiMoLocalClientSessionId: clientSessionId =>
+    ipc.invoke('mimo:set-local-client-session-id', clientSessionId),
+  getMimoTherapistServiceId: () =>
+    ipc.invoke('mimo:get-therapist-service-id') as Promise<string | null>,
   shutdown: () => {
     log.info('shutdown');
     ipc.send('shutdown');
@@ -363,6 +370,52 @@ window.sendChallengeRequest = request => ipc.send('challenge:request', request);
 ipc.on('show-keyboard-shortcuts', () => {
   window.Events.showKeyboardShortcuts();
 });
+
+ipc.on('show-therapist-console', () => {
+  const show = () => {
+    if (window.reduxActions?.globalModals?.showTherapistConsole) {
+      window.reduxActions.globalModals.showTherapistConsole();
+      return;
+    }
+
+    setTimeout(show, 50);
+  };
+
+  show();
+});
+
+function dispatchMiMoIngestFromMain(snapshot: unknown): void {
+  if (!snapshot || typeof snapshot !== 'object') {
+    return;
+  }
+  const row = snapshot as Record<string, unknown>;
+  if (typeof row.clientSessionId !== 'string' || row.clientSessionId.length === 0) {
+    return;
+  }
+  const { lastIngestedUnixMs: _lastIngested, heartbeatUnixMs: hb, ...rest } =
+    row;
+  const run = () => {
+    if (!window.reduxActions?.mimoSession?.ingestMetadata) {
+      setTimeout(run, 50);
+      return;
+    }
+    window.reduxActions.mimoSession.ingestMetadata({
+      ...rest,
+      clientSessionId: row.clientSessionId,
+      heartbeatUnixMs:
+        hb === null || hb === undefined ? undefined : (hb as number),
+    } as MiMoMetadataIngestPayloadType);
+    if (!isProduction(window.getVersion())) {
+      console.info('[MiMo] ingest metadata', snapshot);
+    }
+  };
+  run();
+}
+
+ipc.on('mimo-ingest-metadata', (_event, snapshot: unknown) => {
+  dispatchMiMoIngestFromMain(snapshot);
+});
+
 ipc.on('add-dark-overlay', () => {
   window.Events.addDarkOverlay();
 });
@@ -571,3 +624,8 @@ ipc.on('activate', () => {
 async function whenWindowVisible(): Promise<void> {
   await windowVisible;
 }
+
+// Initialize the MiMo child-process bridge IPC handlers.
+// The renderer-side Redux subscription waits internally until
+// window.reduxStore is available (set by initializeRedux).
+initMimoBridgeRenderer();

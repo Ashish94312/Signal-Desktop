@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none';
+            connect-src http://127.0.0.1:*;
+            font-src 'self';
+            img-src 'self' data:;
+            script-src 'self';
+            style-src 'self' 'unsafe-inline';"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>MiMo Metadata Monitor</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0f1720;
+        --panel: #162130;
+        --panel-alt: #1b2a3d;
+        --border: #2b425d;
+        --text: #e6eef8;
+        --muted: #95a9bf;
+        --accent: #6dd3ff;
+        --good: #6ee7b7;
+        --warn: #fbbf24;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family:
+          ui-monospace, SFMono-Regular, SFMono-Regular, Menlo, Monaco, Consolas,
+          Liberation Mono, monospace;
+        background:
+          radial-gradient(circle at top, rgba(109, 211, 255, 0.12), transparent 30%),
+          linear-gradient(180deg, #111b27 0%, var(--bg) 100%);
+        color: var(--text);
+      }
+
+      main {
+        padding: 18px;
+      }
+
+      h1 {
+        margin: 0 0 8px;
+        font-size: 20px;
+      }
+
+      .subhead {
+        color: var(--muted);
+        margin: 0 0 18px;
+      }
+
+      .toolbar {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        flex-wrap: wrap;
+        margin-bottom: 16px;
+      }
+
+      button {
+        border: 1px solid var(--border);
+        background: var(--panel-alt);
+        color: var(--text);
+        padding: 8px 12px;
+        cursor: pointer;
+      }
+
+      .status {
+        color: var(--muted);
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 12px;
+      }
+
+      .card {
+        border: 1px solid var(--border);
+        background: rgba(22, 33, 48, 0.96);
+        padding: 14px;
+      }
+
+      .card h2 {
+        margin: 0 0 10px;
+        font-size: 14px;
+        color: var(--accent);
+      }
+
+      .kv {
+        margin: 0;
+        display: grid;
+        grid-template-columns: 110px 1fr;
+        gap: 8px;
+        font-size: 12px;
+      }
+
+      .kv dt {
+        color: var(--muted);
+      }
+
+      .empty,
+      pre {
+        border: 1px solid var(--border);
+        background: rgba(10, 17, 26, 0.92);
+        padding: 14px;
+      }
+
+      pre {
+        overflow: auto;
+        font-size: 12px;
+        margin: 16px 0 0;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>MiMo Metadata Monitor</h1>
+      <p class="subhead">
+        Local view of the client-side MiMo metadata store fed by
+        <code>POST /mimo-metadata</code>.
+      </p>
+
+      <div class="toolbar">
+        <button id="refresh" type="button">Refresh</button>
+        <span id="status" class="status">Loading...</span>
+      </div>
+
+      <div id="cards" class="grid"></div>
+      <pre id="raw"></pre>
+    </main>
+    <script src="js/mimo_metadata_monitor.js"></script>
+  </body>
+</html>

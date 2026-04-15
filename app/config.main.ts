@@ -1,6 +1,7 @@
 // Copyright 2017 Signal Messenger, LLC
 // SPDX-License-Identifier: AGPL-3.0-only
 
+import { existsSync } from 'node:fs';
 import { join, basename } from 'node:path';
 import { app } from 'electron';
 
@@ -16,6 +17,36 @@ import { createLogger } from '../ts/logging/log.std.ts';
 import { getAppRootDir } from '../ts/util/appRootDir.main.ts';
 
 const log = createLogger('config');
+
+function maybeLoadEnvFiles(): void {
+  if (app.isPackaged) {
+    return;
+  }
+
+  const loadEnvFile = (
+    process as NodeJS.Process & { loadEnvFile?: (path?: string) => void }
+  ).loadEnvFile;
+  if (typeof loadEnvFile !== 'function') {
+    return;
+  }
+
+  const appRoot = getAppRootDir();
+  [join(appRoot, '.env.local'), join(appRoot, '.env')].forEach(path => {
+    if (!existsSync(path)) {
+      return;
+    }
+
+    try {
+      loadEnvFile(path);
+      log.info(`Loaded environment variables from ${basename(path)}`);
+    } catch (error) {
+      log.warn(
+        `Failed to load environment variables from ${path}`,
+        String(error)
+      );
+    }
+  });
+}
 
 // In production mode, NODE_ENV cannot be customized by the user
 if (app.isPackaged) {
@@ -48,6 +79,7 @@ if (getEnvironment() === Environment.PackagedApp) {
 
 // Call `getAppRootDir()` after hardening since it relies on env variables
 process.env.NODE_CONFIG_DIR = join(getAppRootDir(), 'config');
+maybeLoadEnvFiles();
 
 // We load config after we've made our modifications to NODE_ENV
 // Note: we use `require()` because esbuild moves the imports to the top of

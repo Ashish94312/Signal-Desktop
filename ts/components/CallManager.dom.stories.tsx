@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import * as React from 'react';
+import type { AudioDevice } from '@signalapp/ringrtc';
 import { action } from '@storybook/addon-actions';
 import type { Meta } from '@storybook/react';
 import type { PropsType } from './CallManager.dom.tsx';
@@ -100,17 +101,35 @@ const getCommonActiveCallData = () => ({
   showParticipantsList: false,
 });
 
+const defaultMicrophone: AudioDevice = {
+  name: 'Default Microphone',
+  index: 0,
+  uniqueId: 'default-microphone',
+};
+
+const defaultSpeaker: AudioDevice = {
+  name: 'Default Speaker',
+  index: 0,
+  uniqueId: 'default-speaker',
+};
+
 const createProps = (storyProps: Partial<PropsType> = {}): PropsType => ({
   ...storyProps,
   availableCameras: [],
+  availableCallLinks: storyProps.availableCallLinks ?? [],
+  availableConversations: storyProps.availableConversations ?? [],
   acceptCall: action('accept-call'),
   activeNotificationProfile: undefined,
+  addMembersToGroup: action('add-members-to-group'),
   approveUser: action('approve-user'),
+  availableMicrophones: storyProps.availableMicrophones ?? [defaultMicrophone],
+  availableSpeakers: storyProps.availableSpeakers ?? [defaultSpeaker],
   batchUserAction: action('batch-user-action'),
   bounceAppIconStart: action('bounce-app-icon-start'),
   bounceAppIconStop: action('bounce-app-icon-stop'),
   cancelCall: action('cancel-call'),
   changeCallView: action('change-call-view'),
+  changeIODevice: action('change-io-device'),
   closeNeedPermissionScreen: action('close-need-permission-screen'),
   declineCall: action('decline-call'),
   denyUser: action('deny-user'),
@@ -122,6 +141,11 @@ const createProps = (storyProps: Partial<PropsType> = {}): PropsType => ({
   hasInitialLoadCompleted: true,
   i18n,
   isOnline: true,
+  isTherapistConsoleVisible: false,
+  onCreateCallLink: action('on-create-call-link'),
+  onJoinCallLink: action('on-join-call-link'),
+  onStartAudioCall: action('on-start-audio-call'),
+  onStartVideoCall: action('on-start-video-call'),
   ringingCall: null,
   callLink: storyProps.callLink ?? undefined,
   me: {
@@ -134,9 +158,15 @@ const createProps = (storyProps: Partial<PropsType> = {}): PropsType => ({
   notifyForCall: action('notify-for-call'),
   openSystemPreferencesAction: action('open-system-preferences-action'),
   playRingtone: action('play-ringtone'),
+  selectedCamera: undefined,
+  selectedMicrophone: defaultMicrophone,
+  selectedSpeaker: defaultSpeaker,
   cancelPresenting: action('cancel-presenting'),
   renderDeviceSelection: () => <div />,
   renderReactionPicker: () => <div />,
+  removeClientFromCall: action('remove-client-from-call'),
+  returnToActiveCall: action('return-to-active-call'),
+  sendRemoteMute: action('send-remote-mute'),
   sendGroupCallRaiseHand: action('send-group-call-raise-hand'),
   sendGroupCallReaction: action('send-group-call-reaction'),
   selectPresentingSource: action('select-presenting-source'),
@@ -149,6 +179,7 @@ const createProps = (storyProps: Partial<PropsType> = {}): PropsType => ({
   setRendererCanvas: action('set-renderer-canvas'),
   setOutgoingRing: action('set-outgoing-ring'),
   showContactModal: action('show-contact-modal'),
+  showConversation: action('show-conversation'),
   showShareCallLinkViaSignal: action('show-share-call-link-via-signal'),
   startCall: action('start-call'),
   stopRingtone: action('stop-ringtone'),
@@ -164,6 +195,7 @@ const createProps = (storyProps: Partial<PropsType> = {}): PropsType => ({
   ),
   toggleSelfViewExpanded: action('toggle-self-view-expanded'),
   toggleSettings: action('toggle-settings'),
+  updateCallLinkName: action('update-call-link-name'),
   pauseVoiceNotePlayer: action('pause-audio-player'),
 });
 

@@ -135,6 +135,14 @@ import { promptOSAuth } from '../ts/util/os/promptOSAuthMain.main.ts';
 import { appRelaunch } from '../ts/util/relaunch.main.ts';
 import { getAppRootDir } from '../ts/util/appRootDir.main.ts';
 import { sendDummyKeystroke } from './WindowsNotifications.main.ts';
+import type { MiMoMetadataIngestPayloadType } from './mimo_ingest_http.main.ts';
+import { startMimoIngestHttpServer } from './mimo_ingest_http.main.ts';
+import { startMimoBridgeShim } from './mimo_child_bridge.main.ts';
+import {
+  getMiMoMetadataStoreSnapshot,
+  ingestMiMoMetadata,
+  type MiMoMetadataSnapshotType,
+} from './mimo_metadata_store.main.ts';
 
 const { chmod, realpath, writeFile } = fsExtra;
 const { get, pick, isNumber, isBoolean, some, debounce, noop } = lodash;
@@ -157,6 +165,10 @@ if (OS.isMacOS()) {
 let mainWindow: BrowserWindow | undefined;
 let mainWindowCreated = false;
 let loadingWindow: BrowserWindow | undefined;
+let mimoMetadataMonitorWindow: BrowserWindow | undefined;
+
+/** Signal ACI for MiMo `clientSessionId`, set by renderer once identity is loaded. */
+let cachedMiMoLocalClientSessionId: string | undefined;
 
 // These will be set after app fires the 'ready' event
 let preferredSystemLocales: Array<string> | undefined;
@@ -246,6 +258,73 @@ function showWindow() {
   } else {
     mainWindow.show();
   }
+}
+
+function dispatchMiMoMetadataToRenderer(
+  snapshot: MiMoMetadataSnapshotType
+): void {
+  const win = mainWindow;
+  if (win && !win.webContents.isDestroyed()) {
+    win.webContents.send('mimo-ingest-metadata', snapshot);
+  }
+}
+
+const ORCHESTRATOR_INGEST_URL =
+  String(process.env.MIMO_ORCHESTRATOR_INGEST_URL || '').trim() || null;
+
+async function forwardMiMoMetadataToOrchestrator(
+  payload: MiMoMetadataIngestPayloadType
+): Promise<void> {
+  if (!ORCHESTRATOR_INGEST_URL) {
+    return;
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => {
+    controller.abort();
+  }, 5000);
+
+  try {
+    const response = await fetch(ORCHESTRATOR_INGEST_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json; charset=utf-8' },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+    if (!response.ok && response.status !== 204) {
+      log.warn(
+        `MiMo orchestrator forward failed: HTTP ${response.status} ${response.statusText}`
+      );
+    }
+  } catch (error) {
+    log.warn(
+      'MiMo orchestrator forward error',
+      Errors.toLogFormat(error)
+    );
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function onMiMoMetadataIngested(
+  payload: MiMoMetadataIngestPayloadType,
+  context?: { forwardedByRelay: boolean }
+): void {
+  const snapshot = ingestMiMoMetadata(payload);
+  dispatchMiMoMetadataToRenderer(snapshot);
+  if (context?.forwardedByRelay) {
+    return;
+  }
+  drop(forwardMiMoMetadataToOrchestrator(payload));
+}
+
+function simulateMimoClientMetadata(): void {
+  const snapshot = ingestMiMoMetadata({
+    clientSessionId: `demo-${Date.now()}`,
+    gameId: 'demo-game',
+    heartbeatUnixMs: Date.now(),
+  });
+  dispatchMiMoMetadataToRenderer(snapshot);
 }
 
 if (!process.mas) {
@@ -1037,6 +1116,65 @@ async function createWindow() {
   );
 }
 
+ipc.handle('mimo:set-local-client-session-id', (_event, id: unknown) => {
+  if (id === null || id === undefined) {
+    cachedMiMoLocalClientSessionId = undefined;
+    return;
+  }
+  if (typeof id !== 'string') {
+    return;
+  }
+  const trimmed = id.trim();
+  cachedMiMoLocalClientSessionId = trimmed.length > 0 ? trimmed : undefined;
+});
+
+/** Participant → therapist MiMo over Signal when in group/call-link (see MiMoTherapistMetadataProvider). */
+
+// Cache so we only hit the network once per session.
+let cachedTherapistServiceId: string | null | undefined;
+
+ipc.handle('mimo:get-therapist-service-id', async () => {
+  // Explicit env var takes priority — no network call needed.
+  const explicit = process.env.MIMO_THERAPIST_SERVICE_ID;
+  if (typeof explicit === 'string' && explicit.trim().length > 0) {
+    return explicit.trim();
+  }
+
+  // Auto-discover: fetch /mimo-local-session from the therapist ingest server.
+  // Set MIMO_THERAPIST_INGEST_URL=http://<therapist-ip>:8765 on the client machine.
+  const baseUrl = (process.env.MIMO_THERAPIST_INGEST_URL ?? '').replace(/\/$/, '');
+  if (!baseUrl) {
+    return null;
+  }
+
+  if (cachedTherapistServiceId !== undefined) {
+    return cachedTherapistServiceId;
+  }
+
+  try {
+    const res = await fetch(`${baseUrl}/mimo-local-session`, {
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!res.ok) {
+      cachedTherapistServiceId = null;
+      return null;
+    }
+    const data = (await res.json()) as { clientSessionId?: string | null };
+    const id = data.clientSessionId ?? null;
+    cachedTherapistServiceId = typeof id === 'string' && id.length > 0 ? id : null;
+    log.info(
+      cachedTherapistServiceId
+        ? `mimo: auto-discovered therapist ACI ${cachedTherapistServiceId}`
+        : 'mimo: therapist ACI not yet available from ingest server'
+    );
+    return cachedTherapistServiceId;
+  } catch (error) {
+    log.warn('mimo: failed to fetch therapist ACI from ingest server', String(error));
+    cachedTherapistServiceId = null;
+    return null;
+  }
+});
+
 // Renderer asks if we are done with the database
 ipc.handle('database-ready', async () => {
   if (!sqlInitPromise) {
@@ -1348,6 +1486,68 @@ async function showAbout() {
   });
 
   await safeLoadURL(aboutWindow, await prepareFileUrl([rootDir, 'about.html']));
+}
+
+async function showMimoMetadataMonitorWindow() {
+  if (mimoMetadataMonitorWindow) {
+    mimoMetadataMonitorWindow.show();
+    mimoMetadataMonitorWindow.focus();
+    return;
+  }
+
+  const port = Number(process.env.MIMO_INGEST_PORT) || 8765;
+
+  const windowOptions: Electron.BrowserWindowConstructorOptions = {
+    width: 720,
+    height: 560,
+    resizable: true,
+    title: 'MiMo Metadata Monitor',
+    titleBarStyle: nonMainTitleBarStyle,
+    autoHideMenuBar: true,
+    backgroundColor: await getBackgroundColor(),
+    show: false,
+    webPreferences: {
+      ...defaultWebPrefs,
+      nodeIntegration: false,
+      nodeIntegrationInWorker: false,
+      sandbox: true,
+      contextIsolation: true,
+    },
+  };
+
+  mimoMetadataMonitorWindow = new BrowserWindow(windowOptions);
+
+  await handleCommonWindowEvents(mimoMetadataMonitorWindow);
+
+  mimoMetadataMonitorWindow.on('closed', () => {
+    mimoMetadataMonitorWindow = undefined;
+  });
+
+  mimoMetadataMonitorWindow.once('ready-to-show', () => {
+    mimoMetadataMonitorWindow?.show();
+  });
+
+  const fileUrl = pathToFileURL(join(rootDir, 'mimo_metadata_monitor.html'));
+  fileUrl.searchParams.set('port', String(port));
+  await safeLoadURL(mimoMetadataMonitorWindow, fileUrl.href);
+}
+
+async function showTherapistConsole() {
+  if (!mainWindow) {
+    return;
+  }
+
+  showWindow();
+  const sendShowTherapistConsole = () => {
+    mainWindow?.webContents.send('show-therapist-console');
+  };
+
+  if (mainWindow.webContents.isLoading()) {
+    mainWindow.webContents.once('did-finish-load', sendShowTherapistConsole);
+    return;
+  }
+
+  sendShowTherapistConsole();
 }
 
 async function getIsLinked() {
@@ -2210,6 +2410,14 @@ app.on('ready', async () => {
   log.info('app ready');
   log.info(`starting version ${packageJson.version}`);
 
+  if (getEnvironment() !== Environment.Test) {
+    startMimoIngestHttpServer({
+      onMetadata: onMiMoMetadataIngested,
+      getMetadataSnapshot: getMiMoMetadataStoreSnapshot,
+      getLocalClientSessionId: () => cachedMiMoLocalClientSessionId,
+    });
+  }
+
   // This logging helps us debug user reports about broken devices.
   {
     let getMediaAccessStatus;
@@ -2326,6 +2534,11 @@ app.on('ready', async () => {
   // Run window preloading in parallel with database initialization.
   await createWindow();
 
+  // Start MiMo child-process bridge (forks @mimo/client, relays call state).
+  if (mainWindow && getEnvironment() !== Environment.Test) {
+    startMimoBridgeShim(mainWindow);
+  }
+
   const { error: sqlError } = await sqlInitPromise;
   if (sqlError) {
     log.error('sql.initialize was unsuccessful; returning early');
@@ -2392,12 +2605,17 @@ function setupMenu(options?: Partial<CreateTemplateOptionsType>) {
     openContactUs,
     openForums,
     openJoinTheBeta,
+    openMimoMetadataMonitor: () => {
+      drop(showMimoMetadataMonitorWindow());
+    },
     openReleaseNotes,
     openSupportPage,
     setupAsNewDevice,
     setupAsStandalone,
     stageLocalBackupForImport,
     showAbout,
+    showTherapistConsole,
+    simulateMimoClientMetadata,
     showDebugLog: showDebugLogWindow,
     showKeyboardShortcuts,
     showSettings: () => {
@@ -3152,6 +3370,24 @@ ipc.handle(
     }
   }
 );
+
+ipc.handle('open-external-url', async (_event, rawTarget: string) => {
+  const parsedUrl = maybeParseUrl(rawTarget);
+  if (!parsedUrl) {
+    throw new Error('Invalid URL');
+  }
+
+  const { protocol } = parsedUrl;
+  if (
+    protocol !== 'https:' &&
+    protocol !== 'http:' &&
+    protocol !== 'rustdesk:'
+  ) {
+    throw new Error(`Protocol not allowed: ${protocol}`);
+  }
+
+  await shell.openExternal(rawTarget);
+});
 
 ipc.handle('get-auto-launch', async () => {
   return app.getLoginItemSettings(await getDefaultLoginItemSettings())
